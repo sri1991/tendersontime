@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TenderScout AI</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #1e293b;
+            --text-sub: #64748b;
+            --border: #e2e8f0;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        header {
+            width: 100%;
+            background: var(--card-bg);
+            padding: 1.5rem 0;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 800px;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-main);
+            margin: 0;
+        }
+
+        .search-area {
+            margin-top: 3rem;
+            text-align: center;
+            width: 100%;
+        }
+
+        .search-box {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 1rem 1.5rem;
+            font-size: 1.1rem;
+            border: 2px solid var(--border);
+            border-radius: 50px;
+            outline: none;
+            transition: all 0.2s;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        input[type="text"]:focus {
+            border-color: var(--primary);
+            box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.2);
+        }
+
+        button.search-btn {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.6rem 1.2rem;
+            border-radius: 30px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+
+        button.search-btn:hover {
+            background: #1d4ed8;
+        }
+
+        .stats {
+            margin-top: 1rem;
+            color: var(--text-sub);
+            font-size: 0.9rem;
+            height: 1.5rem;
+        }
+
+        .results-list {
+            margin-top: 2rem;
+            width: 100%;
+            max-width: 800px;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            padding-bottom: 3rem;
+        }
+
+        .result-card {
+            background: var(--card-bg);
+            padding: 1.5rem;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .result-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 0.5rem;
+        }
+
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--primary);
+            margin: 0;
+            line-height: 1.4;
+        }
+
+        .score-badge {
+            background: #ecfdf5;
+            color: #059669;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            flex-shrink: 0;
+            margin-left: 1rem;
+        }
+
+        .card-meta {
+            display: flex;
+            gap: 1rem;
+            margin-top: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .tag {
+            background: #f1f5f9;
+            color: var(--text-sub);
+            padding: 0.2rem 0.6rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .tag.domain {
+            background: #eff6ff;
+            color: #1e40af;
+        }
+
+        .tag.proc-type {
+            background: #fff7ed;
+            color: #9a3412;
+        }
+
+        .detail-row {
+            margin-top: 0.8rem;
+            color: var(--text-sub);
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .icon {
+            opacity: 0.7;
+        }
+
+        /* Loading Spinner */
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 3px solid var(--primary);
+            width: 24px;
+            height: 24px;
+            -webkit-animation: spin 1s linear infinite;
+            /* Safari */
+            animation: spin 1s linear infinite;
+            display: none;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <div class="container">
+            <h1>🛡️ TenderScout AI</h1>
+        </div>
+    </header>
+
+    <div class="search-area container">
+        <div class="search-box">
+            <input type="text" id="searchInput"
+                placeholder="Search for tenders (e.g., 'Hospital construction in Mumbai')..."
+                onkeypress="handleEnter(event)">
+            <button class="search-btn" onclick="performSearch()">Search</button>
+        </div>
+        <div style="margin-top: 10px; display: flex; justify-content: center; align-items: center; gap: 10px;">
+            <label
+                style="color: var(--text-sub); font-size: 0.9rem; display: flex; align-items: center; cursor: pointer;">
+                <input type="checkbox" id="includeCorrigendum" style="margin-right: 6px;"> Include Corrigendum
+            </label>
+        </div>
+        <div class="stats" id="searchStats"></div>
+        <div class="loader" id="loader"></div>
+    </div>
+
+    <div class="results-list container" id="resultsList">
+        <!-- Results will appear here -->
+    </div>
+
+    <script>
+        const API_URL = "http://localhost:8000/api/search";
+
+        function handleEnter(e) {
+            if (e.key === 'Enter') {
+                performSearch();
+            }
+        }
+
+        async function performSearch() {
+            const query = document.getElementById('searchInput').value;
+            const includeCorrigendum = document.getElementById('includeCorrigendum').checked;
+
+            if (!query) return;
+
+            const resultsContainer = document.getElementById('resultsList');
+            const statsContainer = document.getElementById('searchStats');
+            const loader = document.getElementById('loader');
+
+            // Reset UI
+            resultsContainer.innerHTML = '';
+            statsContainer.innerText = '';
+            loader.style.display = 'block';
+
+            try {
+                const response = await fetch(`${API_URL}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ query: query, limit: 50, include_corrigendum: includeCorrigendum })
+                });
+
+                if (!response.ok) {
+                    throw new Error("Search failed");
+                }
+
+                const data = await response.json();
+                loader.style.display = 'none';
+
+                // Update Stats
+                statsContainer.innerText = `Found ${data.count} results in ${data.latency_seconds}s`;
+
+                // Render Results
+                data.results.forEach(item => {
+                    const card = document.createElement('div');
+                    card.className = 'result-card';
+                    card.innerHTML = `
+                        <div class="card-header">
+                            <h3 class="card-title"><a href="${item.url}" target="_blank" style="text-decoration:none; color:inherit;">${item.title}</a></h3>
+                            <span class="score-badge">${(item.score * 100).toFixed(1)}% Match</span>
+                        </div>
+                        <div class="card-meta">
+                            <span class="tag domain">${item.core_domain}</span>
+                            <span class="tag proc-type">${item.procurement_type}</span>
+                            <span class="tag" style="background:#fce7f3; color:#9d174d;">📅 ${item.closing_date}</span>
+                            <span class="tag" style="background:#fff7ed; color:#9a3412;">🌍 ${item.country}</span>
+                        </div>
+                        <p style="margin: 0.8rem 0; font-size: 0.95rem; color: #475569; line-height: 1.5;">${item.description}</p>
+                        <div class="detail-row">
+                            <span>🏛️ ${item.authority}</span>
+                            <span>📍 ${item.city}, ${item.state} | ID: ${item.tot_id}</span>
+                            <a href="${item.url}" target="_blank" style="margin-left:auto; color:var(--primary); font-weight:600; text-decoration:none;">View Tender &rarr;</a>
+                        </div>
+                    `;
+                    resultsContainer.appendChild(card);
+                });
+
+                if (data.results.length === 0) {
+                    resultsContainer.innerHTML = '<p style="text-align:center; color:#64748b;">No relevant tenders found.</p>';
+                }
+
+            } catch (error) {
+                console.error(error);
+                loader.style.display = 'none';
+                statsContainer.innerText = "Error performing search.";
+            }
+        }
+    </script>
+</body>
+
+</html>
