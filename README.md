@@ -48,7 +48,7 @@ graph TD
 
 ---
 
-## � Match Score Logic
+## Match Score Logic
 
 The percentage score displayed in the UI is a **heuristic representation** of the vector distance between your query and the tender document.
 
@@ -63,7 +63,7 @@ The percentage score displayed in the UI is a **heuristic representation** of th
 
 ---
 
-## �🛠️ Tech Stack
+## Tech Stack
 
 - **AI Model**: Google Gemini 2.5 Flash Lite (Enrichment & Intent)
 - **Embeddings**: Google `text-embedding-004`
@@ -74,7 +74,7 @@ The percentage score displayed in the UI is a **heuristic representation** of th
 
 ---
 
-## ⚡ Getting Started
+## Getting Started
 
 ### Prerequisites
 - Python 3.10+

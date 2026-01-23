@@ -148,13 +148,53 @@ class SmartSearchEngine:
         # 3. Vector Search
         query_vec = self.get_embedding(refined_query)
         
+        # Fetch slightly more to account for post-filtering
+        fetch_k = k * 2 if not include_corrigendum else k
+        
         results = self.collection.query(
             query_embeddings=[query_vec],
-            n_results=k,
+            n_results=fetch_k,
             where=where_clause,
             include=["metadatas", "documents", "distances"]
         )
         
+        # 4. Runtime Guardrail: Filter by Title text if metadata failed
+        # Many old records have is_corrigendum=False but title="Corrigendum: ..."
+        if not include_corrigendum:
+            final_ids = []
+            final_metas = []
+            final_dists = []
+            final_docs = []
+            
+            # Chroma results are lists of lists [[]]
+            r_ids = results["ids"][0]
+            r_metas = results["metadatas"][0]
+            r_dists = results["distances"][0]
+            r_docs = results["documents"][0] if results.get("documents") else []
+            
+            for i in range(len(r_ids)):
+                title = r_metas[i].get("original_title", "").lower()
+                summary = r_metas[i].get("description", "").lower() # Check description too?
+                
+                # STRING CHECK:
+                if "corrigendum" in title:
+                    # Skip it
+                    continue
+                    
+                final_ids.append(r_ids[i])
+                final_metas.append(r_metas[i])
+                final_dists.append(r_dists[i])
+                if r_docs: final_docs.append(r_docs[i])
+                
+                if len(final_ids) >= k:
+                    break
+            
+            # Reconstruct result format
+            results["ids"] = [final_ids]
+            results["metadatas"] = [final_metas]
+            results["distances"] = [final_dists]
+            if r_docs: results["documents"] = [final_docs]
+            
         return results
 
 if __name__ == "__main__":

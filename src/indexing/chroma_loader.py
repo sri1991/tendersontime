@@ -105,7 +105,7 @@ class ChromaLoader:
                         "url": data.get("Tender_Notice_Document", "#"),
                         "ref_no": str(data.get("RefNo", hash(signal_text))),
                         "tot_id": str(data.get("TOT_ID", "N/A")),
-                        "is_corrigendum": "corrigendum" in data.get("Summary", "").lower() or "corrigendum" in data.get("Title", "").lower()
+                        "is_corrigendum": "corrigendum" in (data.get("Summary") or data.get("Title", "")).lower()
                     }
                     
                     # Fix Authority Name if Unknown
