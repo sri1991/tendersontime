@@ -68,17 +68,43 @@ async def search_tenders(request: SearchRequest):
             # We convert to a 'match score' relative to a threshold.
             # Assuming distance ranges ~0.5 (good) to ~1.0 (bad) for this model.
             dist = distances[i]
-            # Heuristic scaling: Map 0.0-1.0 distance to 100-0% score
-            # But "good" matches in vectors are often 0.3-0.5 distance.
-            # Let's simple invert and clip for now, or use exponential decay.
-            # score = 1 / (1 + dist) # 0->1, 1->0.5
+            # Calibrated Scoring using Piecewise Linear Mapping for text-embedding-004
+            # Dist 0.5 -> 100%
+            # Dist 0.7 -> 90% (Strong Semantic Match)
+            # Dist 0.9 -> 60% (Broad Context)
+            # Dist 1.1 -> 20% (Weak)
+            # Dist 1.2 -> 0%
             
-            # Simple linear inversion for now, but calibrated
-            score = max(0, 1 - dist) if i < len(distances) else 0 
+            def get_score(d):
+                if d <= 0.5: return 1.0
+                if d <= 0.7: return 1.0 - (0.1 * (d - 0.5) / 0.2) # 1.0 -> 0.9
+                if d <= 0.9: return 0.9 - (0.3 * (d - 0.7) / 0.2) # 0.9 -> 0.6
+                if d <= 1.1: return 0.6 - (0.4 * (d - 0.9) / 0.2) # 0.6 -> 0.2
+                if d <= 1.2: return 0.2 - (0.2 * (d - 1.1) / 0.1) # 0.2 -> 0.0
+                return 0.0
+
+            score = get_score(dist)
+            score_pct = round(score * 100, 1)
+            
+            # Determine Label and Color
+            if score >= 0.85:
+                label = "Excellent Match"
+                color = "green" # UI class
+            elif score >= 0.65:
+                label = "Strong Match"
+                color = "teal"
+            elif score >= 0.45:
+                label = "Good Match"
+                color = "yellow"
+            else:
+                label = "Potential Lead"
+                color = "gray"
             
             processed_results.append({
                 "id": tender_id,
-                "score": round(score, 4),
+                "score": score_pct,
+                "match_label": label,
+                "match_color": color,
                 "title": meta.get("original_title", "No Title"),
                 "description": meta.get("description", "No description available."),
                 "core_domain": meta.get("core_domain", "Unclassified"),

@@ -152,6 +152,27 @@
             margin-left: 1rem;
         }
 
+        /* Match Colors */
+        .score-badge.green {
+            background: #dcfce7;
+            color: #15803d;
+        }
+
+        .score-badge.teal {
+            background: #ccfbf1;
+            color: #0f766e;
+        }
+
+        .score-badge.yellow {
+            background: #fef9c3;
+            color: #a16207;
+        }
+
+        .score-badge.gray {
+            background: #f1f5f9;
+            color: #64748b;
+        }
+
         .card-meta {
             display: flex;
             gap: 1rem;
@@ -296,7 +317,9 @@
                     card.innerHTML = `
                         <div class="card-header">
                             <h3 class="card-title"><a href="${item.url}" target="_blank" style="text-decoration:none; color:inherit;">${item.title}</a></h3>
-                            <span class="score-badge">${(item.score * 100).toFixed(1)}% Match</span>
+                            <span class="score-badge ${item.match_color || 'green'}">
+                                ${item.match_label || 'Match'} (${item.score.toFixed(1)}%)
+                            </span>
                         </div>
                         <div class="card-meta">
                             <span class="tag domain">${item.core_domain}</span>
