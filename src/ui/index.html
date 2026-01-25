@@ -267,13 +267,115 @@
         <!-- Results will appear here -->
     </div>
 
+    <!-- Chat Modal -->
+    <div id="chatModal" class="modal"
+        style="display:none; position:fixed; z-index:100; left:0; top:0; width:100%; height:100%; overflow:auto; background-color:rgba(0,0,0,0.4);">
+        <div class="modal-content"
+            style="background-color:#fefefe; margin:10% auto; padding:20px; border:1px solid #888; width:80%; max-width:600px; border-radius:12px; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
+            <div
+                style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; border-bottom:1px solid #eee; padding-bottom:10px;">
+                <h3 style="margin:0; color:var(--primary);">💬 Tender Chat</h3>
+                <span onclick="closeChat()"
+                    style="color:#aaa; font-size:28px; font-weight:bold; cursor:pointer;">&times;</span>
+            </div>
+            <div id="chatContext" style="font-size:0.85rem; color:#64748b; margin-bottom:1rem; font-style:italic;">
+            </div>
+
+            <div id="chatHistory"
+                style="height:300px; overflow-y:auto; background:#f8fafc; padding:10px; border-radius:8px; margin-bottom:1rem; border:1px solid #e2e8f0;">
+                <p style="text-align:center; color:#94a3b8; font-size:0.9rem;">Ask a question about this tender...</p>
+            </div>
+
+            <div style="display:flex; gap:10px;">
+                <input type="text" id="chatInput" placeholder="Type your question..."
+                    style="flex:1; padding:0.8rem; border:1px solid #ccc; border-radius:6px;"
+                    onkeypress="handleChatEnter(event)">
+                <button onclick="sendChat()"
+                    style="background:var(--primary); color:white; border:none; padding:0 1.5rem; border-radius:6px; cursor:pointer; font-weight:600;">Ask</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const API_URL = "http://localhost:8000/api/search";
+        const CHAT_URL = "http://localhost:8000/api/chat";
+        let currentTenderId = null;
 
         function handleEnter(e) {
             if (e.key === 'Enter') {
                 performSearch();
             }
+        }
+
+        function handleChatEnter(e) {
+            if (e.key === 'Enter') {
+                sendChat();
+            }
+        }
+
+        function openChat(tenderId, title) {
+            currentTenderId = tenderId;
+            document.getElementById('chatModal').style.display = 'block';
+            document.getElementById('chatContext').innerText = `Context: ${title.substring(0, 60)}...`;
+            document.getElementById('chatHistory').innerHTML = '<p style="text-align:center; color:#94a3b8; font-size:0.9rem;">Ask a question about this tender...</p>';
+            document.getElementById('chatInput').focus();
+        }
+
+        function closeChat() {
+            document.getElementById('chatModal').style.display = 'none';
+        }
+
+        // Close modal if clicking outside
+        window.onclick = function (event) {
+            if (event.target == document.getElementById('chatModal')) {
+                closeChat();
+            }
+        }
+
+        async function sendChat() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            if (!message || !currentTenderId) return;
+
+            const history = document.getElementById('chatHistory');
+
+            // User Message
+            const userMsg = document.createElement('div');
+            userMsg.innerHTML = `<p style="text-align:right;"><span style="background:#e0f2fe; padding:6px 10px; border-radius:10px; display:inline-block; max-width:80%;">${message}</span></p>`;
+            history.appendChild(userMsg);
+
+            input.value = '';
+            history.scrollTop = history.scrollHeight;
+
+            // Loading placeholder
+            const loadingId = 'loading-' + Date.now();
+            const loadingMsg = document.createElement('div');
+            loadingMsg.id = loadingId;
+            loadingMsg.innerHTML = `<p style="text-align:left;"><span style="color:#64748b; font-size:0.9rem;">Thinking...</span></p>`;
+            history.appendChild(loadingMsg);
+            history.scrollTop = history.scrollHeight;
+
+            try {
+                const response = await fetch(CHAT_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ tender_id: currentTenderId, message: message })
+                });
+
+                const data = await response.json();
+
+                // Remove loading
+                document.getElementById(loadingId).remove();
+
+                // AI Response
+                const aiMsg = document.createElement('div');
+                aiMsg.innerHTML = `<p style="text-align:left;"><span style="background:#f1f5f9; padding:8px 12px; border-radius:10px; display:inline-block; max-width:85%; color:#334155;"><strong>AI:</strong> ${data.answer}</span></p>`;
+                history.appendChild(aiMsg);
+
+            } catch (error) {
+                document.getElementById(loadingId).innerText = "Error: " + error.message;
+            }
+            history.scrollTop = history.scrollHeight;
         }
 
         async function performSearch() {
@@ -314,6 +416,9 @@
                 data.results.forEach(item => {
                     const card = document.createElement('div');
                     card.className = 'result-card';
+                    // Escape title for onclick safely
+                    const safeTitle = item.title.replace(/'/g, "\\'");
+
                     card.innerHTML = `
                         <div class="card-header">
                             <h3 class="card-title"><a href="${item.url}" target="_blank" style="text-decoration:none; color:inherit;">${item.title}</a></h3>
@@ -331,7 +436,10 @@
                         <div class="detail-row">
                             <span>🏛️ ${item.authority}</span>
                             <span>📍 ${item.city}, ${item.state} | ID: ${item.tot_id}</span>
-                            <a href="${item.url}" target="_blank" style="margin-left:auto; color:var(--primary); font-weight:600; text-decoration:none;">View Tender &rarr;</a>
+                            <div style="margin-left:auto; display:flex; gap:10px;">
+                                <button onclick="openChat('${item.id}', '${safeTitle}')" style="background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; padding:0.4rem 0.8rem; border-radius:6px; cursor:pointer; font-weight:600; font-size:0.8rem;">💬 Chat</button>
+                                <a href="${item.url}" target="_blank" style="color:var(--primary); font-weight:600; text-decoration:none; display:flex; align-items:center;">View Tender &rarr;</a>
+                            </div>
                         </div>
                     `;
                     resultsContainer.appendChild(card);

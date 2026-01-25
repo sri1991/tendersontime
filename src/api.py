@@ -37,6 +37,10 @@ class SearchRequest(BaseModel):
     limit: int = 20
     include_corrigendum: bool = False
 
+class ChatRequest(BaseModel):
+    tender_id: str
+    message: str
+
 @app.get("/")
 async def read_index():
     return FileResponse('src/ui/index.html')
@@ -44,6 +48,14 @@ async def read_index():
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+
+@app.post("/api/chat")
+async def chat_tender(request: ChatRequest):
+    if not search_engine:
+        raise HTTPException(status_code=503, detail="Search Engine not initialized")
+    
+    answer = await search_engine.chat_with_tender(request.tender_id, request.message)
+    return {"answer": answer}
 
 @app.post("/api/search")
 async def search_tenders(request: SearchRequest):

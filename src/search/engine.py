@@ -197,6 +197,82 @@ class SmartSearchEngine:
             
         return results
 
+    async def chat_with_tender(self, tender_id: str, query: str) -> str:
+        """
+        Chat with a specific tender context.
+        """
+        # 1. Fetch Tender Context
+        try:
+            record = self.collection.get(
+                ids=[tender_id],
+                include=["metadatas", "documents"]
+            )
+            
+            if not record["ids"]:
+                return "Tender not found."
+                
+            meta = record["metadatas"][0]
+            # Use 'documents' (signal text + keywords) as primary context, plus metadata
+            context_text = record["documents"][0] if record["documents"] else ""
+            
+            # 1.1 Fetch Live Content (New Feature)
+            # Try to fetch the URL content to give Gemini more details
+            url = meta.get('url')
+            live_content = ""
+            if url and url.startswith("http"):
+                try:
+                    import httpx
+                    import re
+                    async with httpx.AsyncClient(follow_redirects=True, timeout=10.0) as client:
+                        resp = await client.get(url)
+                        if resp.status_code == 200:
+                            # Simple HTML to Text
+                            raw_html = resp.text
+                            # Remove script/style
+                            clean_text = re.sub(r'<(script|style)[^>]*>.*?</\1>', '', raw_html, flags=re.DOTALL)
+                            # Remove tags
+                            clean_text = re.sub(r'<[^>]+>', ' ', clean_text)
+                            # Collapse whitespace
+                            clean_text = re.sub(r'\s+', ' ', clean_text).strip()
+                            live_content = clean_text[:10000] # Limit context window to 10k chars
+                except Exception as fetch_err:
+                    logging.warning(f"Failed to fetch live URL {url}: {fetch_err}")
+
+            # Construct Context
+            context = f"""
+            TITLE: {meta.get('original_title', 'Unknown')}
+            DESCRIPTION: {meta.get('description', 'Unknown')}
+            AUTHORITY: {meta.get('authority_name', 'Unknown')}
+            LOCATION: {meta.get('location_city', '')}, {meta.get('location_state', '')}, {meta.get('country', '')}
+            CLOSING DATE: {meta.get('closing_date', 'Unknown')}
+            URL: {url}
+            
+            EXTRA DETAILS (Keywords): {context_text}
+            
+            --- LIVE PAGE CONTENT (FETCHED FROM URL) ---
+            {live_content if live_content else "Could not fetch live content."}
+            --------------------------------------------
+            """
+            
+            # 2. Generate Answer
+            prompt = f"""
+            You are a procurement assistant helping a user understand this specific tender. 
+            Answer their question using ONLY the provided metadata. 
+            If the info is not in the text, say "I don't see that detail in the summary."
+            
+            TENDER DATA:
+            {context}
+            
+            USER QUESTION: {query}
+            """
+            
+            response = await self.intent_model.generate_content_async(prompt)
+            return response.text
+            
+        except Exception as e:
+            logging.error(f"Chat Error: {e}")
+            return "Sorry, I encountered an error analyzing this tender."
+
 if __name__ == "__main__":
     # Test Stub
     import sys

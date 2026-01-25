@@ -48,18 +48,23 @@ graph TD
 
 ---
 
-## Match Score Logic
+### 5. **Interactive Tender Chat** 🆕
+   - **Ask Questions**: Chat with any tender to get specific details (e.g., "What is the EMD amount?").
+   - **Live Context**: The AI fetches the **live URL content** in real-time to answer questions not present in the summary.
+   - **Context-Aware**: Answers are grounded in the specific tender's metadata and documents.
 
-The percentage score displayed in the UI is a **heuristic representation** of the vector distance between your query and the tender document.
+---
 
-1.  **Metric**: We use **Distance** in high-dimensional space (768 dimensions).
-2.  **Calculation**: `Score = MAX(0, 1 - Distance)`
-3.  **Interpretation**:
-    - **100%**: Exact semantic match (rare in vector search).
-    - **~40-60%**: Strong conceptual match (e.g., "Hospital" matches "Clinic").
-    - **~30%**: Related context (useful for broad discovery).
+## 🎯 Match Score Logic (Calibrated)
 
-> **Note**: In vector search, even a 35% score often indicates a highly relevant result compared to keyword matching.
+We use a **Piecewise Linear Calibration** to map raw vector distances to intuitive "Confidence Scores":
+
+1.  **Excellent Match (> 85%)**: Distance ≤ 0.7 (Strong semantic alignment).
+2.  **Strong Match (65-85%)**: Distance 0.7 - 0.9.
+3.  **Good Match (45-65%)**: Distance 0.9 - 1.1.
+4.  **Potential Lead (< 45%)**: Distance > 1.1.
+
+> **Why?** Raw vector distances in high-dimensional space (768d) are counter-intuitive. A distance of 0.7 is often a "perfect" match in natural language. Our calibration aligns the UI with human expectation.
 
 ---
 
