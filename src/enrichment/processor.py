@@ -23,6 +23,21 @@ class TenderEnricher:
         genai.configure(api_key=self.api_key)
         # using 'gemini-2.5-flash-lite' as requested
         self.model = genai.GenerativeModel("gemini-2.5-flash-lite")
+        
+        # Load keywords
+        self.keywords_str = "No specific keywords loaded."
+        try:
+            keywords_path = os.path.join(os.path.dirname(__file__), "keywords.json")
+            if os.path.exists(keywords_path):
+                with open(keywords_path, 'r', encoding='utf-8') as f:
+                    # Load as dict but format as JSON string for the prompt
+                    keywords_data = json.load(f)
+                    self.keywords_str = json.dumps(keywords_data, indent=2)
+                    logging.info(f"Loaded keywords from {keywords_path}")
+            else:
+                logging.warning(f"keywords.json not found at {keywords_path}")
+        except Exception as e:
+             logging.warning(f"Error loading keywords: {e}")
 
     async def enrich_tender(self, title: str, description: str = "") -> Dict[str, Any]:
         """
@@ -31,7 +46,11 @@ class TenderEnricher:
         # Fallback for nulls
         desc_text = description if description and pd.notna(description) else "No description provided."
         
-        prompt = ENRICHMENT_PROMPT.format(title=title, description=desc_text)
+        prompt = ENRICHMENT_PROMPT.format(
+            title=title, 
+            description=desc_text, 
+            keyword_mapping=self.keywords_str
+        )
         
         config = genai.types.GenerationConfig(
             temperature=0.1, 
@@ -58,6 +77,7 @@ class TenderEnricher:
             logging.error(f"Error enriching tender '{title}': {e}")
             return {
                 "core_domain": "Unclassified",
+                "project_tags": [],
                 "procurement_type": "Unknown",
                 "search_keywords": [],
                 "entities": {},

@@ -6,14 +6,20 @@ Analyze the following tender:
 Title: {title}
 Description: {description}
 
+## CONTEXT: PROJECT TAGS (SUB-SECTOR KEYWORDS)
+The following is a list of specific Project Tags grouped by their source category.
+Use this mapping to identify specific `project_tags` that apply to this tender.
+{keyword_mapping}
+
 ## TASKS
 
 1. **Domain & Category Assignment**:
-   - Assign a `core_domain` from: [Healthcare, Infrastructure, IT, Energy, Defense, Education, Agriculture, Transport].
+   - Assign a **BROAD** `core_domain` from this fixed list: 
+     [Agriculture, Healthcare, Infrastructure, Energy, Defense, Technology, Transport, Other].
+   - **Project Tags**: Select 1-3 most relevant specific tags from the provided `keyword_mapping` (VALUES) if they match the tender content.
+     - Example: If tender is "Ear Tags", `core_domain`="Agriculture", `project_tags`=["Animal Identification Ear Tags"].
    - Assign a `procurement_type` from: [Works, Supply, Services, Consultancy].
    - **CRITICAL**: Distinguish between "Hospital Construction" (Infrastructure) and "Medical Equipment" (Healthcare).
-     - IF "Construction of Hospital" -> Domain: **Infrastructure**, Secondary: Healthcare.
-     - IF "Supply of MRI Machine" -> Domain: **Healthcare**.
 
 2. **Semantic Expansion (The "Relatedness Map")**:
    - Generate `search_keywords` to help users find this tender even if they search for related terms.
@@ -37,6 +43,7 @@ Description: {description}
 ## OUTPUT SCHEMA (JSON ONLY)
 {{
   "core_domain": "String",
+  "project_tags": ["String"],
   "procurement_type": "String",
   "search_keywords": ["String", "String"],
   "entities": {{

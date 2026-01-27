@@ -300,6 +300,7 @@
         const API_URL = "http://localhost:8000/api/search";
         const CHAT_URL = "http://localhost:8000/api/chat";
         let currentTenderId = null;
+        let lastSearchQuery = "";
 
         function handleEnter(e) {
             if (e.key === 'Enter') {
@@ -411,6 +412,7 @@
 
                 // Update Stats
                 statsContainer.innerText = `Found ${data.count} results in ${data.latency_seconds}s`;
+                lastSearchQuery = query;
 
                 // Render Results
                 data.results.forEach(item => {
@@ -436,7 +438,11 @@
                         <div class="detail-row">
                             <span>🏛️ ${item.authority}</span>
                             <span>📍 ${item.city}, ${item.state} | ID: ${item.tot_id}</span>
-                            <div style="margin-left:auto; display:flex; gap:10px;">
+                            <div style="margin-left:auto; display:flex; gap:10px; align-items:center;">
+                                <div style="display:flex; gap:2px; margin-right:5px; border-right:1px solid #e2e8f0; padding-right:10px;">
+                                    <button onclick="sendFeedback('${item.id}', 1, this)" title="Relevant" style="background:transparent; border:none; cursor:pointer; font-size:1.1rem; opacity:0.6; transition:opacity 0.2s;">👍</button>
+                                    <button onclick="sendFeedback('${item.id}', -1, this)" title="Not Relevant" style="background:transparent; border:none; cursor:pointer; font-size:1.1rem; opacity:0.6; transition:opacity 0.2s;">👎</button>
+                                </div>
                                 <button onclick="openChat('${item.id}', '${safeTitle}')" style="background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; padding:0.4rem 0.8rem; border-radius:6px; cursor:pointer; font-weight:600; font-size:0.8rem;">💬 Chat</button>
                                 <a href="${item.url}" target="_blank" style="color:var(--primary); font-weight:600; text-decoration:none; display:flex; align-items:center;">View Tender &rarr;</a>
                             </div>
@@ -453,6 +459,31 @@
                 console.error(error);
                 loader.style.display = 'none';
                 statsContainer.innerText = "Error performing search.";
+            }
+        }
+
+        async function sendFeedback(resultId, rating, btnElement) {
+            if (!lastSearchQuery) return;
+
+            // Visual feedback
+            const parent = btnElement.parentElement;
+            const buttons = parent.querySelectorAll('button');
+            buttons.forEach(b => b.style.opacity = '0.3'); // Dim all
+            btnElement.style.opacity = '1.0'; // Highlight selected
+            btnElement.innerText = rating === 1 ? '✅' : '❌'; // Checkmark/X visual confirmation
+
+            try {
+                await fetch('http://localhost:8000/api/feedback', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        query: lastSearchQuery,
+                        result_id: resultId,
+                        rating: rating
+                    })
+                });
+            } catch (error) {
+                console.error("Feedback failed:", error);
             }
         }
     </script>

@@ -20,25 +20,10 @@ User Query: "{query}"
 
 ## Rules
 1. **Industry Domain**:
-   - Determine if the query implies a specific domain (Healthcare, Infrastructure, IT, Defense, Energy).
-   - "Hospital Construction" -> Domain: "Healthcare" (Wait! The guardrail says Hospital Construction finds Clinics but BLOCKS Roads. The enriched data likely tagged "Hospital Construction" as Works/Infrastructure if it's purely building, BUT the brief says:
-     - Query: "Hospital Construction" -> Should find "Construction of a new Clinic".
-     - Enriched logic said: "Construction of road to City Hospital" -> Infrastructure. 
-     - "Construction of a new Clinic" -> ?? That might be Healthcare or Infrastructure/Works depending on the strictness. 
-     - **RE-READING BRIEF**: 
-       > Query: "Hospital Construction"
-       > Should find: "Construction of a new Clinic in Brazil."
-       > Should block: "Restoration of BT Road near City Hospital."
-       > Logic: "If the tender is for a road... the domain MUST be Transport/Infrastructure."
-       
-     - This implies "Clinic Construction" remains in "Healthcare" (or "Infrastructure-Health" if we had that). 
-     - The strict rule was specifically for ROADS/BRIDGES being Infrastructure regardless of location.
-     - So, a "Clinic Building" is likely "Healthcare" + "Works".
-     
-   - So if user searches "Hospital Construction":
-     - Domain: **Healthcare** (Primary intent) OR **Infrastructure** (if they strictly mean civil works).
-     - But to block "Roads", we must rely on "Roads" being in "Infrastructure" and "Clinic" being in "Healthcare".
-     - Thus Intent MUST be "Healthcare".
+   - Determine if the query implies a specific **BROAD** domain.
+   - Allowed Domains: [Healthcare, Infrastructure, Energy, Defense, Technology, Transport, Agriculture, Other].
+   - "Hospital Construction" -> Domain: "Healthcare" (Primary) AND "Infrastructure" (Secondary).
+   - "Ear Tag" -> Domain: "Agriculture".
 
 2. **Procurement Type (Optional)**:
    - "Construction", "Building" -> Works
@@ -46,14 +31,13 @@ User Query: "{query}"
    - "Maintenance" -> Services
 
 3. **Refined Query**:
-   - Strip domain keywords to leave the semantic core if needed, or keep it. 
-   - Example: "Hospital Construction" -> "Construction of Medical Facility" (Signal).
+   - Strip domain keywords to leave the semantic core if needed.
 
 ## Output Schema
 Return JSON:
 {{
-  "core_domains": ["Healthcare", "Infrastructure"], # List allowed domains. Usually just one specific one if clear.
-  "procurement_types": ["Works", "Supply", "Services"], # List allowed types.
+  "core_domains": ["Healthcare", "Infrastructure"], # List allowed broad domains.
+  "procurement_types": ["Works", "Supply", "Services"],
   "refined_query": "String"
 }}
 """

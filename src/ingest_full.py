@@ -4,9 +4,10 @@ import time
 import sys
 
 # Configuration
-TOTAL_RECORDS = 88398
-START_OFFSET = 10000 # We already did 0-10000
-CHUNK_SIZE = 10000
+# Configuration
+TOTAL_RECORDS = 10000
+START_OFFSET = 0
+CHUNK_SIZE = 500
 INPUT_CSV = "tender_dataset_06082025_6Jan2026.csv"
 PYTHON_EXEC = "venv/bin/python"
 
@@ -24,6 +25,10 @@ def main():
         print(f"==================================================")
         
         output_file = f"batch_{offset}_{offset+limit}.jsonl"
+        
+        # Clean up previous run residue
+        if os.path.exists(output_file):
+            os.remove(output_file)
         
         # 1. Enrichment
         # python -m src.enrichment.processor <csv> <jsonl> --limit <limit> --offset <offset>

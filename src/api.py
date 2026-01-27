@@ -7,6 +7,8 @@ from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import os
+import json
+from datetime import datetime
 
 from src.search.engine import SmartSearchEngine
 
@@ -41,6 +43,12 @@ class ChatRequest(BaseModel):
     tender_id: str
     message: str
 
+class FeedbackRequest(BaseModel):
+    query: str
+    result_id: str
+    rating: int  # 1 for functional/relevant, -1 for not relevant
+    comment: Optional[str] = None
+
 @app.get("/")
 async def read_index():
     return FileResponse('src/ui/index.html')
@@ -56,6 +64,28 @@ async def chat_tender(request: ChatRequest):
     
     answer = await search_engine.chat_with_tender(request.tender_id, request.message)
     return {"answer": answer}
+
+@app.post("/api/feedback")
+async def submit_feedback(request: FeedbackRequest):
+    try:
+        feedback_entry = {
+            "timestamp": datetime.now().isoformat(),
+            "query": request.query,
+            "result_id": request.result_id,
+            "rating": request.rating,
+            "comment": request.comment
+        }
+        
+        # Ensure data directory exists
+        os.makedirs("data", exist_ok=True)
+        
+        with open("data/feedback_logs.jsonl", "a") as f:
+            f.write(json.dumps(feedback_entry) + "\n")
+            
+        return {"status": "success", "message": "Feedback recorded"}
+    except Exception as e:
+        logging.error(f"Feedback Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/search")
 async def search_tenders(request: SearchRequest):

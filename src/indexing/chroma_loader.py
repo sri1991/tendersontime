@@ -79,9 +79,10 @@ class ChromaLoader:
                     # CRITICAL: Use 'signal_summary' + keywords for embedding
                     signal_text = data.get("signal_summary", "")
                     keywords = ", ".join(data.get("search_keywords", []))
+                    tags = ", ".join(data.get("project_tags", []))
                     
                     # Augmented text for better retrieval
-                    embedding_text = f"{signal_text}. Keywords: {keywords}"
+                    embedding_text = f"{signal_text}. Tags: {tags}. Keywords: {keywords}"
                     
                     if not signal_text:
                         logging.warning(f"Skipping record with empty signal_summary: {data}")
@@ -91,14 +92,14 @@ class ChromaLoader:
                     entities = data.get("entities", {})
                     meta = {
                         "core_domain": data.get("core_domain", "Unclassified"),
+                        "project_tags": tags,
                         "procurement_type": data.get("procurement_type", "Unknown"),
                         "authority_name": entities.get("authority_name", "Unknown"),
                         "location_city": entities.get("location_city", "Unknown"),
                         "location_state": entities.get("location_state", "Unknown"),
                         "country": data.get("Country", "Unknown"),
                         # Store raw title/desc in metadata for retrieval display
-                        "country": data.get("Country", "Unknown"),
-                        # Store raw title/desc in metadata for retrieval display
+                        "original_title": data.get("Summary", data.get("Title", ""))[:300],
                         "original_title": data.get("Summary", data.get("Title", ""))[:300], 
                         "description": data.get("Description", data.get("signal_summary", ""))[:500],
                         "closing_date": data.get("Closing_Date", "N/A"),
