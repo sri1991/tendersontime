@@ -56,11 +56,7 @@ services:
     startCommand: python src/ingest_full.py
     envVars:
       - key: GEMINI_API_KEY
-        fromService:
-            type: web
-            name: tenders-api
-            property: env_var
-            envVarKey: GEMINI_API_KEY
+        sync: false
       - key: CHROMA_HOST
         fromService:
           type: pserv
