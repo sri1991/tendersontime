@@ -4,3 +4,7 @@ duckdb
 pandas
 pytest
 google-genai
+fastapi
+uvicorn
+python-multipart
+python-dotenv

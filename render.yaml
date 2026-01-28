@@ -5,7 +5,7 @@ services:
   - type: pserv
     name: tenders-chromadb
     env: docker
-    image: chromadb/chroma:latest
+    dockerfilePath: Dockerfile.chroma
     plan: starter
     disk:
       name: chroma-storage
@@ -44,12 +44,11 @@ services:
       - key: PYTHON_VERSION
         value: 3.10.12
 
-# ----------------------------------------
-# 3. Ingestion Worker (Cron Job)
-# ----------------------------------------
-# Note: For production, you should update ingestion scripts to download CSVs from S3
-cronjobs:
-  - name: ingestion-worker
+  # ----------------------------------------
+  # 3. Ingestion Worker (Cron Job)
+  # ----------------------------------------
+  - type: cron
+    name: ingestion-worker
     env: python
     region: singapore
     schedule: "0 */6 * * *" # Every 6 hours
