@@ -3,3 +3,4 @@ chromadb
 duckdb
 pandas
 pytest
+google-genai

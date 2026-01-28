@@ -1,10 +1,9 @@
 
-ENRICHMENT_PROMPT = """
-You are an expert Tender Analyst. Your goal is to structure and enrich procurement data for a high-precision search engine.
 
-Analyze the following tender:
-Title: {title}
-Description: {description}
+# Static Part (Candidate for Caching)
+# Note: We put the keyword mapping here.
+STATIC_SYSTEM_PROMPT_TEMPLATE = """
+You are an expert Tender Analyst. Your goal is to structure and enrich procurement data for a high-precision search engine.
 
 ## CONTEXT: PROJECT TAGS (SUB-SECTOR KEYWORDS)
 The following is a list of specific Project Tags grouped by their source category.
@@ -54,3 +53,14 @@ Use this mapping to identify specific `project_tags` that apply to this tender.
   "signal_summary": "String"
 }}
 """
+
+# Dynamic Part (Per Tender)
+TENDER_USER_PROMPT_TEMPLATE = """
+Analyze the following tender:
+Title: {title}
+Description: {description}
+"""
+
+# Keep original for backward compatibility if needed (combining them)
+ENRICHMENT_PROMPT = STATIC_SYSTEM_PROMPT_TEMPLATE + "\n" + TENDER_USER_PROMPT_TEMPLATE
+

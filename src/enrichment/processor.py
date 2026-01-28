@@ -9,7 +9,9 @@ from dotenv import load_dotenv
 from src.cleaning.cleaner import CurrencyNormalizer, DateStandardizer, Deduplicator
 
 load_dotenv()
-from src.enrichment.prompts import ENRICHMENT_PROMPT
+from src.enrichment.prompts import ENRICHMENT_PROMPT, STATIC_SYSTEM_PROMPT_TEMPLATE, TENDER_USER_PROMPT_TEMPLATE
+import datetime
+from google.generativeai import caching
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -21,23 +23,81 @@ class TenderEnricher:
              logging.warning("No GEMINI_API_KEY found. API calls will fail.")
         
         genai.configure(api_key=self.api_key)
-        # using 'gemini-2.5-flash-lite' as requested
-        self.model = genai.GenerativeModel("gemini-2.5-flash-lite")
         
-        # Load keywords
+        # Load keywords FIRST so we can use them in caching
         self.keywords_str = "No specific keywords loaded."
         try:
             keywords_path = os.path.join(os.path.dirname(__file__), "keywords.json")
             if os.path.exists(keywords_path):
                 with open(keywords_path, 'r', encoding='utf-8') as f:
-                    # Load as dict but format as JSON string for the prompt
                     keywords_data = json.load(f)
                     self.keywords_str = json.dumps(keywords_data, indent=2)
                     logging.info(f"Loaded keywords from {keywords_path}")
             else:
                 logging.warning(f"keywords.json not found at {keywords_path}")
+                keywords_data = [] # Fallback
         except Exception as e:
              logging.warning(f"Error loading keywords: {e}")
+             keywords_data = []
+
+        # Strategy A: Context Caching
+        self.use_cache = False
+        try:
+            # Format the static part once
+            formatted_system_prompt = STATIC_SYSTEM_PROMPT_TEMPLATE.format(keyword_mapping=self.keywords_str)
+            
+            # Create Cache
+            # ATTEMPT to use gemini-2.5-flash-lite with caching.
+            # If this model is too new for caching, the try/except will catch it.
+            self.cache = caching.CachedContent.create(
+                model='models/gemini-2.5-flash-lite', 
+                display_name="tender_enrichment_cache",
+                system_instruction=formatted_system_prompt,
+                ttl=datetime.timedelta(minutes=60),
+            )
+            self.model = genai.GenerativeModel.from_cached_content(cached_content=self.cache)
+            self.use_cache = True
+            logging.info("Context Caching ENABLED for Enrichment (gemini-2.5-flash-lite).")
+        except Exception as e:
+            logging.warning(f"Context Caching setup failed for gemini-2.5-flash-lite: {e}. Falling back to standard generation.")
+            # Fallback to standard generation WITHOUT cache using the requested model
+            self.model = genai.GenerativeModel("gemini-2.5-flash-lite") 
+            self.use_cache = False
+
+        # Pre-Filter init
+        # Flatten keywords for fast searching
+             
+        # Flatten keywords for fast searching
+        self.flat_keywords = []
+        if isinstance(keywords_data, dict):
+            for category, keys in keywords_data.items():
+                if isinstance(keys, list):
+                    self.flat_keywords.extend([k.lower() for k in keys])
+        elif isinstance(keywords_data, list):
+            self.flat_keywords = [k.lower() for k in keywords_data]
+            
+        logging.info(f"Pre-Filter initialized with {len(self.flat_keywords)} keywords.")
+
+    def _should_enrich(self, title: str, description: str) -> bool:
+        """
+        Strategy B: Cost Optimization.
+        Returns False if tender is likely junk (too short AND no keywords).
+        """
+        text = (str(title) + " " + str(description)).lower()
+        
+        # 1. Length Check
+        if len(text) < 20: # Extremely short
+            return False
+            
+        # 2. Keyword Check (Fast fail)
+        # If text is reasonably long (>100 chars), we might give it a chance even without keywords?
+        # But to be safe for cost, let's require at least ONE broad match if text is short-ish.
+        if len(text) < 100:
+            # For short text, STRICTLY require a keyword match
+            if not any(k in text for k in self.flat_keywords):
+                return False
+                
+        return True
 
     async def enrich_tender(self, title: str, description: str = "") -> Dict[str, Any]:
         """
@@ -46,11 +106,29 @@ class TenderEnricher:
         # Fallback for nulls
         desc_text = description if description and pd.notna(description) else "No description provided."
         
-        prompt = ENRICHMENT_PROMPT.format(
-            title=title, 
-            description=desc_text, 
-            keyword_mapping=self.keywords_str
-        )
+        # Strategy B: Pre-Filter
+        if not self._should_enrich(title, desc_text):
+            return {
+                "core_domain": "Unclassified",
+                "project_tags": [],
+                "procurement_type": "Unknown",
+                "search_keywords": [],
+                "entities": {},
+                "signal_summary": title,
+                "note": "Skipped by Cost Optimizer (Pre-Filter)"
+            }
+        
+        # Select Prompt based on Cache Status
+        if self.use_cache:
+            # We only send the dynamic part, system prompt is cached
+            prompt = TENDER_USER_PROMPT_TEMPLATE.format(title=title, description=desc_text)
+        else:
+            # Full prompt
+            prompt = ENRICHMENT_PROMPT.format(
+                title=title, 
+                description=desc_text, 
+                keyword_mapping=self.keywords_str
+            )
         
         config = genai.types.GenerationConfig(
             temperature=0.1, 

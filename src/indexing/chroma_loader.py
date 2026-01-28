@@ -6,43 +6,70 @@ import logging
 from typing import List, Dict, Any
 import chromadb
 from chromadb.config import Settings
-import google.generativeai as genai
+import google.generativeai as genai # Keep for other files potentially? No, new SDK.
+from google import genai
+from google.genai import types
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# ...
 
 class ChromaLoader:
     def __init__(self, collection_name: str = "tenders_v1", persist_directory: str = "./chroma_db", api_key: str = None):
         self.api_key = api_key or os.getenv("GEMINI_API_KEY")
         if not self.api_key:
              logging.warning("No GEMINI_API_KEY found. Embeddings will fail.")
-        genai.configure(api_key=self.api_key)
         
-        self.client = chromadb.PersistentClient(path=persist_directory)
+        # Initialize New Client
+        self.client_genai = genai.Client(api_key=self.api_key)
+        
+        # CHROMA CONNECTION LOGIC
+        chroma_host = os.getenv("CHROMA_HOST")
+        chroma_port = os.getenv("CHROMA_PORT")
+        
+        if chroma_host and chroma_port:
+            logging.info(f"Connecting to ChromaDB Server at {chroma_host}:{chroma_port}...")
+            self.client = chromadb.HttpClient(host=chroma_host, port=int(chroma_port))
+        else:
+            logging.info(f"Connecting to Local ChromaDB at {persist_directory}...")
+            self.client = chromadb.PersistentClient(path=persist_directory)
+            
         self.collection = self.client.get_or_create_collection(name=collection_name)
         
     def generate_embeddings(self, texts: List[str]) -> List[List[float]]:
         """
-        Generates embeddings using Google Generative AI.
+        Generates embeddings using Google GenAI SDK (v2).
         """
         # Batching for API limits
-        batch_size = 20
+        batch_size = 50 # New SDK might handle larger batches, but sticking to safe limit
         all_embeddings = []
         
         for i in range(0, len(texts), batch_size):
             batch = texts[i:i+batch_size]
             try:
-                # model='models/text-embedding-004' is typical for GenAI
-                result = genai.embed_content(
-                    model="models/text-embedding-004",
-                    content=batch,
-                    task_type="retrieval_document"
+                # Use the working model found: gemini-embedding-001
+                response = self.client_genai.models.embed_content(
+                    model="gemini-embedding-001",
+                    contents=batch,
                 )
-                # GenAI returns dict with 'embedding' key (list of lists)
-                all_embeddings.extend(result['embedding'])
+                
+                # Response structure is different in new SDK
+                # It returns an object with .embeddings attribute which is a list
+                if response.embeddings:
+                    # Each embedding in the list has .values attribute? Check SDK docs or inspect.
+                    # Based on docs: result.embeddings is a list of Embeddings object or list of lists?
+                    # "print(result.embeddings)" shows it returns list of Embedding(values=[...]) or similar.
+                    # Let's assume standard behavior: extraction needed.
+                    
+                    # Update: In Python SDK 0.x it was dict. In new SDK it's object.
+                    # Let's extract values properly.
+                    batch_embeddings = [e.values for e in response.embeddings]
+                    all_embeddings.extend(batch_embeddings)
+                else:
+                    logging.error(f"Empty embeddings response for batch {i}")
+                    
             except Exception as e:
                 logging.error(f"Error embedding batch {i}-{i+batch_size}: {e}")
-                raise
+                # Crash if real embedding fails, no more mocks
+                raise 
                 
         return all_embeddings
 

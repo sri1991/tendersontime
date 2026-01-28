@@ -1,0 +1,71 @@
+services:
+  # ----------------------------------------
+  # 1. Vector Database (ChromaDB)
+  # ----------------------------------------
+  - type: pserv
+    name: tenders-chromadb
+    env: docker
+    image: chromadb/chroma:latest
+    plan: starter
+    disk:
+      name: chroma-storage
+      mountPath: /chroma/chroma
+      sizeGB: 10
+    envVars:
+      - key: IS_PERSISTENT
+        value: TRUE
+      - key: ANONYMIZED_TELEMETRY
+        value: FALSE
+
+  # ----------------------------------------
+  # 2. Search API
+  # ----------------------------------------
+  - type: web
+    name: tenders-api
+    env: python
+    region: singapore
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn src.api:app --host 0.0.0.0 --port $PORT
+    disk:
+      name: feedback-storage
+      mountPath: /opt/render/project/src/data
+      sizeGB: 1
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false # User will be prompted to enter this
+      - key: CHROMA_HOST
+        fromService:
+          type: pserv
+          name: tenders-chromadb
+          property: host
+      - key: CHROMA_PORT
+        value: 8000
+      - key: PYTHON_VERSION
+        value: 3.10.12
+
+# ----------------------------------------
+# 3. Ingestion Worker (Cron Job)
+# ----------------------------------------
+# Note: For production, you should update ingestion scripts to download CSVs from S3
+cronjobs:
+  - name: ingestion-worker
+    env: python
+    region: singapore
+    schedule: "0 */6 * * *" # Every 6 hours
+    buildCommand: pip install -r requirements.txt
+    startCommand: python src/ingest_full.py
+    envVars:
+      - key: GEMINI_API_KEY
+        fromService:
+            type: web
+            name: tenders-api
+            property: env_var
+            envVarKey: GEMINI_API_KEY
+      - key: CHROMA_HOST
+        fromService:
+          type: pserv
+          name: tenders-chromadb
+          property: host
+      - key: CHROMA_PORT
+        value: 8000

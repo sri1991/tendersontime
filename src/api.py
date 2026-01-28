@@ -47,7 +47,11 @@ class FeedbackRequest(BaseModel):
     query: str
     result_id: str
     rating: int  # 1 for functional/relevant, -1 for not relevant
+    position: Optional[int] = None # Rank in the results list (0, 1, 2...)
+    session_id: Optional[str] = None # For tracking user sessions
+    meta: Optional[Dict[str, Any]] = None # Snapshot of the result metadata for dataset training
     comment: Optional[str] = None
+
 
 @app.get("/")
 async def read_index():
@@ -73,12 +77,16 @@ async def submit_feedback(request: FeedbackRequest):
             "query": request.query,
             "result_id": request.result_id,
             "rating": request.rating,
+            "position": request.position,
+            "session_id": request.session_id,
+            "result_metadata_snapshot": request.meta, # Valuable for training later
             "comment": request.comment
         }
         
         # Ensure data directory exists
         os.makedirs("data", exist_ok=True)
         
+        # In Docker, 'data/' should be a mounted volume
         with open("data/feedback_logs.jsonl", "a") as f:
             f.write(json.dumps(feedback_entry) + "\n")
             

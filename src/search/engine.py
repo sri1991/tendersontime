@@ -4,7 +4,9 @@ import logging
 import asyncio
 from typing import List, Dict, Any, Optional
 import chromadb
-import google.generativeai as genai
+# import google.generativeai as genai # REMOVE OLD SDK
+from google import genai
+from google.genai import types
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -47,26 +49,44 @@ class SmartSearchEngine:
         self.api_key = api_key or os.getenv("GEMINI_API_KEY")
         if not self.api_key:
              logging.warning("No GEMINI_API_KEY found.")
-        genai.configure(api_key=self.api_key)
         
-        # Init Vector Store
-        self.client = chromadb.PersistentClient(path=persist_directory)
+        # Init New Client
+        self.client_genai = genai.Client(api_key=self.api_key)
+        
+        # CHROMA CONNECTION LOGIC
+        chroma_host = os.getenv("CHROMA_HOST")
+        chroma_port = os.getenv("CHROMA_PORT")
+        
+        if chroma_host and chroma_port:
+            logging.info(f"Connecting to ChromaDB Server at {chroma_host}:{chroma_port}...")
+            self.client = chromadb.HttpClient(host=chroma_host, port=int(chroma_port))
+        else:
+            logging.info(f"Connecting to Local ChromaDB at {persist_directory}...")
+            self.client = chromadb.PersistentClient(path=persist_directory)
+
         self.collection = self.client.get_or_create_collection("tenders_v1")
-        
-        # Init Models
-        self.intent_model = genai.GenerativeModel("gemini-2.5-flash-lite")
         
     async def analyze_intent(self, query: str) -> Dict[str, Any]:
         """
         Gemini analyzes query to get filters.
+        Using new SDK model.generate_content
         """
         prompt = INTENT_PROMPT_TEMPLATE.format(query=query)
-        config = genai.types.GenerationConfig(response_mime_type="application/json", temperature=0.0)
         
         try:
-            response = await self.intent_model.generate_content_async(
-                prompt,
-                generation_config=config
+            # New SDK usage
+            # config = types.GenerateContentConfig(...)
+            # response = self.client_genai.models.generate_content(model=..., contents=...)
+            
+            # Using 'gemini-2.0-flash' or 'gemini-2.5-flash-lite' as configured?
+            # Sticking to the lite model requested: gemini-2.5-flash-lite
+            response = await self.client_genai.aio.models.generate_content(
+                model="gemini-2.5-flash-lite",
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    temperature=0.0
+                )
             )
             text = response.text.replace("```json", "").replace("```", "").strip()
             return json.loads(text)
@@ -75,12 +95,15 @@ class SmartSearchEngine:
             return {}
 
     def get_embedding(self, text: str) -> List[float]:
-        result = genai.embed_content(
-            model="models/text-embedding-004",
-            content=text,
-            task_type="retrieval_query"
-        )
-        return result['embedding']
+        try:
+            response = self.client_genai.models.embed_content(
+                model="gemini-embedding-001",
+                contents=text,
+            )
+            return response.embeddings[0].values
+        except Exception as e:
+            logging.error(f"Embedding failed: {e}")
+            raise
 
     async def search(self, query: str, k: int = 20, include_corrigendum: bool = False):
         print(f"\n--- Searching for: '{query}' (Corrigendum: {include_corrigendum}) ---")
@@ -250,7 +273,17 @@ class SmartSearchEngine:
             USER QUESTION: {query}
             """
             
-            response = await self.intent_model.generate_content_async(prompt)
+            # response = await self.intent_model.generate_content_async(prompt)
+            # New SDK (sync for now unless using async client? strictly client.models is sync? 
+            # The new SDK has an async client `genai.Client(http_options={'api_version':...})`? 
+            # Actually, standard client operations are synchronous. 
+            # If we need async, we must use `genai.Client(..., http_options=...)` or check docs.
+            # Docs say: `client.aio.models.generate_content` for async.
+            
+            response = await self.client_genai.aio.models.generate_content(
+                model="gemini-2.5-flash-lite",
+                contents=prompt
+            )
             return response.text
             
         except Exception as e:

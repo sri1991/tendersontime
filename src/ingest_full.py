@@ -5,7 +5,7 @@ import sys
 
 # Configuration
 # Configuration
-TOTAL_RECORDS = 10000
+TOTAL_RECORDS = 20000
 START_OFFSET = 0
 CHUNK_SIZE = 500
 INPUT_CSV = "tender_dataset_06082025_6Jan2026.csv"
