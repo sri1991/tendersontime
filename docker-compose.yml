@@ -1,0 +1,56 @@
+version: '3.9'
+
+services:
+  # 1. Vector Database Service
+  chroma:
+    image: chromadb/chroma:latest
+    container_name: to_chroma
+    volumes:
+      - ./chroma_data:/chroma/chroma
+    ports:
+      - "8000:8000"
+    environment:
+      - IS_PERSISTENT=TRUE
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # 2. Search API Service
+  api:
+    build: .
+    container_name: to_api
+    command: uvicorn src.api:app --host 0.0.0.0 --port 8080
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/app/data  # Persist feedback logs and read input data
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - CHROMA_HOST=chroma
+      - CHROMA_PORT=8000
+    depends_on:
+      chroma:
+        condition: service_healthy
+
+  # 3. Ingestion Worker Service
+  ingest_worker:
+    build: .
+    container_name: to_worker
+    # Assumes you have a scheduler_worker.py or similar entry point. 
+    # If not, we can use a simple sleep loop or cron. 
+    # For now, let's assume we want to run the full ingestion once on startup or periodically.
+    # To keep it running, we might need a loop script. 
+    # For this MVP, let's just keep it alive or run a specific script.
+    # If scheduler_worker.py doesn't exist yet, we will create a simple placeholder.
+    command: python -c "import time; print('Worker started. Sleeping...'); time.sleep(3600)" 
+    volumes:
+      - ./data:/app/data
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - CHROMA_HOST=chroma
+      - CHROMA_PORT=8000
+    depends_on:
+      chroma:
+        condition: service_healthy

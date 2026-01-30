@@ -128,7 +128,7 @@ class ChromaLoader:
                         # Store raw title/desc in metadata for retrieval display
                         "original_title": data.get("Summary", data.get("Title", ""))[:300],
                         "original_title": data.get("Summary", data.get("Title", ""))[:300], 
-                        "description": data.get("Description", data.get("signal_summary", ""))[:500],
+                        "description": str(data.get("Description") or data.get("signal_summary") or "")[:500],
                         "closing_date": data.get("Closing_Date", "N/A"),
                         "url": data.get("Tender_Notice_Document", "#"),
                         "ref_no": str(data.get("RefNo", hash(signal_text))),
@@ -138,7 +138,9 @@ class ChromaLoader:
                     
                     # Fix Authority Name if Unknown
                     if meta["authority_name"] in ["Unknown", "N/A"] and data.get("Purchaser_Name"):
-                         meta["authority_name"] = data.get("Purchaser_Name")[:100]
+                         # Ensure it is a string
+                         p_name = str(data.get("Purchaser_Name"))
+                         meta["authority_name"] = p_name[:100]
                     
                     documents.append(embedding_text)
                     metadatas.append(meta)

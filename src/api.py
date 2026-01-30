@@ -36,7 +36,7 @@ except Exception as e:
 
 class SearchRequest(BaseModel):
     query: str
-    limit: int = 20
+    limit: int = 100
     include_corrigendum: bool = False
 
 class ChatRequest(BaseModel):

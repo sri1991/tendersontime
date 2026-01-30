@@ -5,8 +5,8 @@ import sys
 
 # Configuration
 # Configuration
-TOTAL_RECORDS = 20000
-START_OFFSET = 0
+TOTAL_RECORDS = 90000
+START_OFFSET = 85000
 CHUNK_SIZE = 500
 INPUT_CSV = "tender_dataset_06082025_6Jan2026.csv"
 PYTHON_EXEC = "venv/bin/python"
