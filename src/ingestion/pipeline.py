@@ -2,6 +2,8 @@ import os
 import time
 import logging
 import pandas as pd
+import hashlib
+import json
 from tqdm import tqdm
 from src.enrichment.processor import TenderEnricher
 from src.indexing.chroma_loader import ChromaLoader
@@ -32,7 +34,6 @@ class IngestionPipeline:
         """
         self.original_input_file = input_file
         self.api_key = api_key or os.getenv("GEMINI_API_KEY")
-        self.start_offset = start_offset
         self.chunk_size = chunk_size
         self.total_records = total_records
         self.progress_callback = progress_callback
@@ -40,6 +41,15 @@ class IngestionPipeline:
         # Helper: Convert Excel to CSV if needed
         self.working_csv_file = self._prepare_input_file(input_file)
         
+        # Checkpoint Logic
+        self.checkpoint_dir = "checkpoints"
+        os.makedirs(self.checkpoint_dir, exist_ok=True)
+        self.file_signature = self._get_file_signature(self.working_csv_file)
+        self.checkpoint_file = os.path.join(self.checkpoint_dir, f"{self.file_signature}.json")
+        
+        # Determine Start Offset (Resume vs New)
+        self.start_offset = self._load_checkpoint(start_offset)
+
         # Initialize components
         self.enricher = TenderEnricher(api_key=self.api_key)
         self.loader = ChromaLoader(api_key=self.api_key)
@@ -47,6 +57,53 @@ class IngestionPipeline:
         # Determine total records if not provided
         if self.total_records is None:
             self._count_total_records()
+
+    def _get_file_signature(self, file_path: str) -> str:
+        """
+        Generates a unique signature for the file based on size and first 4KB.
+        """
+        try:
+            stats = os.stat(file_path)
+            file_size = stats.st_size
+            
+            hasher = hashlib.md5()
+            with open(file_path, 'rb') as f:
+                buf = f.read(4096)
+                hasher.update(buf)
+                
+            # Combine size and header hash
+            signature_base = f"{file_size}_{hasher.hexdigest()}"
+            return hashlib.md5(signature_base.encode()).hexdigest()
+        except Exception as e:
+            logging.warning(f"Failed to generate file signature: {e}")
+            return "unknown_signature"
+
+    def _load_checkpoint(self, requested_offset: int) -> int:
+        """
+        Checks for existing checkpoint. Returns the offset to start from.
+        """
+        if os.path.exists(self.checkpoint_file):
+            try:
+                with open(self.checkpoint_file, 'r') as f:
+                    data = json.load(f)
+                    last_offset = data.get("last_offset", 0)
+                    if last_offset > requested_offset:
+                        logging.info(f"RESUMING ingestion from checkpoint offset: {last_offset}")
+                        return last_offset
+            except Exception as e:
+                logging.warning(f"Failed to load checkpoint: {e}")
+        
+        return requested_offset
+
+    def _save_checkpoint(self, offset: int):
+        """
+        Saves current progress to checkpoint file.
+        """
+        try:
+            with open(self.checkpoint_file, 'w') as f:
+                json.dump({"last_offset": offset, "updated_at": time.time()}, f)
+        except Exception as e:
+            logging.warning(f"Failed to save checkpoint: {e}")
 
     def _prepare_input_file(self, file_path: str) -> str:
         """
@@ -177,7 +234,14 @@ class IngestionPipeline:
                         "last_log": f"Processed chunk {offset}-{offset+limit} in {chunk_duration:.2f}s"
                     })
                 
+                # SAVE CHECKPOINT
+                self._save_checkpoint(offset + limit)
+                
         logging.info("Ingestion Pipeline Completed Successfully.")
+
+        # CLEANUP CHECKPOINT
+        if os.path.exists(self.checkpoint_file):
+            os.remove(self.checkpoint_file)
 
         if self.progress_callback:
             await self.progress_callback({
