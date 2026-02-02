@@ -252,6 +252,10 @@ To ingest new data:
     *   **Enrichment**: `python src/enrichment/processor.py input.csv output.jsonl --limit 1000`
     *   **Index**: `python src/indexing/chroma_loader.py output.jsonl`
 
+echo "GEMINI_API_KEY=-JStA" > .env
+
+python src/ingest_full.py [optional_path_to_excel_or_csv]    
+
 ---
 
 ## 🤝 Contributing

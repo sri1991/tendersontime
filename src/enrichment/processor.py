@@ -184,7 +184,7 @@ class TenderEnricher:
             
         return enriched_rows
 
-    def process_csv_to_jsonl(self, input_csv: str, output_jsonl: str, batch_size: int = 50, limit: int = None, offset: int = 0):
+    async def process_csv_to_jsonl(self, input_csv: str, output_jsonl: str, batch_size: int = 50, limit: int = None, offset: int = 0):
         """
         Reads CSV, cleans & deduplicates, enriches in batches, writes to JSONL.
         Supports pagination via limit/offset.
@@ -257,7 +257,8 @@ class TenderEnricher:
         # We don't clear output file here because we might be appending from multiple runs. 
         # User responsible for managing output file cleanup or rotation.
 
-        asyncio.run(_run_all())
+        # Await the execution directly since we are now async
+        await _run_all()
 
 if __name__ == "__main__":
     import sys
@@ -277,4 +278,4 @@ if __name__ == "__main__":
         sys.exit(1)
         
     enricher = TenderEnricher(api_key=api_key)
-    enricher.process_csv_to_jsonl(args.input_csv, args.output_jsonl, limit=args.limit, offset=args.offset)
+    asyncio.run(enricher.process_csv_to_jsonl(args.input_csv, args.output_jsonl, limit=args.limit, offset=args.offset))

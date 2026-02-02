@@ -85,7 +85,7 @@ class IngestionPipeline:
             logging.warning(f"Could not automatically count records: {e}. Defaulting to process until end.")
             self.total_records = 999999 # Safe fallback if we can't count? Or just rely on loop break.
 
-    def run(self):
+    async def run(self):
         """
         Executes the full pipeline: Enrichment -> Indexing.
         """
@@ -134,7 +134,7 @@ class IngestionPipeline:
                     # process_csv_to_jsonl doesn't return count.
                     # But it writes to output_file.
                     
-                    self.enricher.process_csv_to_jsonl(
+                    await self.enricher.process_csv_to_jsonl(
                         input_csv=self.working_csv_file,
                         output_jsonl=output_file,
                         batch_size=50, 
