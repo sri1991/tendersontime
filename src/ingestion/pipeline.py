@@ -17,7 +17,8 @@ logging.basicConfig(
 
 class IngestionPipeline:
     def __init__(self, input_file: str, api_key: str = None, 
-                 start_offset: int = 0, total_records: int = None, chunk_size: int = 500):
+                 start_offset: int = 0, total_records: int = None, chunk_size: int = 500,
+                 progress_callback=None):
         """
         Initializes the ingestion pipeline.
         
@@ -27,12 +28,14 @@ class IngestionPipeline:
             start_offset: Record index to start processing from.
             total_records: Total records to process (if None, will try to count).
             chunk_size: Number of records to process in each batch.
+            progress_callback: Optional async function(progress_data) to call with updates.
         """
         self.original_input_file = input_file
         self.api_key = api_key or os.getenv("GEMINI_API_KEY")
         self.start_offset = start_offset
         self.chunk_size = chunk_size
         self.total_records = total_records
+        self.progress_callback = progress_callback
         
         # Helper: Convert Excel to CSV if needed
         self.working_csv_file = self._prepare_input_file(input_file)
@@ -164,8 +167,25 @@ class IngestionPipeline:
                 
                 # Update progress bar
                 pbar.update(limit)
+
+                # Callback Update
+                if self.progress_callback:
+                    await self.progress_callback({
+                        "status": "processing",
+                        "current": offset + limit,
+                        "total": self.total_records,
+                        "last_log": f"Processed chunk {offset}-{offset+limit} in {chunk_duration:.2f}s"
+                    })
                 
         logging.info("Ingestion Pipeline Completed Successfully.")
+
+        if self.progress_callback:
+            await self.progress_callback({
+                "status": "completed",
+                "current": self.total_records,
+                "total": self.total_records,
+                "last_log": "Ingestion Completed Successfully."
+            })
         
         # Cleanup temp turned csv if it was converted
         if self.working_csv_file != self.original_input_file and os.path.exists(self.working_csv_file):

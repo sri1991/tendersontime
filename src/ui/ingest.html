@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tender Ingestion Pipeline</title>
+    <!-- Tailwind CSS (via CDN for simplicity, match existing style request) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a;
+            color: #e2e8f0;
+        }
+
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+        }
+    </style>
+</head>
+
+<body class="min-h-screen p-8">
+
+    <div class="max-w-4xl mx-auto space-y-8">
+
+        <!-- Header -->
+        <div class="flex justify-between items-center">
+            <div>
+                <h1
+                    class="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-400">
+                    Ingestion Pipeline Control
+                </h1>
+                <p class="text-slate-400 mt-2">Upload daily tender data (Excel/CSV) for enrichment and indexing.</p>
+            </div>
+
+            <div class="glass-panel px-6 py-3 text-center">
+                <p class="text-sm text-slate-400 uppercase tracking-wider font-semibold">Live Index Count</p>
+                <div class="text-2xl font-bold text-green-400" id="chroma-count">Loading...</div>
+            </div>
+        </div>
+
+        <!-- Upload Section -->
+        <div class="glass-panel p-8">
+            <h2 class="text-xl font-semibold mb-4 text-white">1. Upload Data File</h2>
+            <div class="flex gap-4 items-end">
+                <div class="flex-1">
+                    <label class="block text-sm font-medium text-slate-400 mb-2">Select File (.xlsx, .csv)</label>
+                    <input type="file" id="file-input" class="block w-full text-sm text-slate-300
+                        file:mr-4 file:py-2 file:px-4
+                        file:rounded-full file:border-0
+                        file:text-sm file:font-semibold
+                        file:bg-blue-600 file:text-white
+                        hover:file:bg-blue-700
+                        cursor-pointer bg-slate-800 rounded-lg border border-slate-700 p-2 focus:outline-none focus:border-blue-500
+                    " />
+                </div>
+                <button onclick="startIngestion()"
+                    class="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-2 px-6 rounded-lg transition-all shadow-lg shadow-blue-500/30">
+                    Start Ingestion
+                </button>
+            </div>
+        </div>
+
+        <!-- Progress Section -->
+        <div class="glass-panel p-8" id="progress-panel">
+            <h2 class="text-xl font-semibold mb-4 text-white flex justify-between">
+                <span>2. Pipeline Progress</span>
+                <span id="status-badge" class="text-sm px-3 py-1 rounded-full bg-slate-700 text-slate-300">Idle</span>
+            </h2>
+
+            <!-- Progress Bar -->
+            <div class="w-full bg-slate-700 rounded-full h-4 mb-2 overflow-hidden">
+                <div id="progress-bar" class="bg-blue-500 h-4 rounded-full transition-all duration-500"
+                    style="width: 0%"></div>
+            </div>
+            <div class="flex justify-between text-sm text-slate-400 mb-6">
+                <span id="progress-text">0%</span>
+                <span id="records-text">0 / 0 Records</span>
+            </div>
+
+            <!-- Logs -->
+            <div class="bg-slate-900 rounded-lg p-4 font-mono text-xs text-green-400 h-64 overflow-y-auto border border-slate-800"
+                id="log-window">
+                <div class="text-slate-500 italic">Waiting for logs...</div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin; // Or hardcode http://localhost:8000
+        let pollingInterval = null;
+
+        async function fetchStatus() {
+            try {
+                const res = await fetch(`${API_BASE}/api/ingest/status`);
+                const data = await res.json();
+
+                // Update Chroma Count
+                document.getElementById('chroma-count').innerText = data.chroma_count.toLocaleString();
+
+                // Update Progress
+                const pct = data.progress;
+                document.getElementById('progress-bar').style.width = `${pct}%`;
+                document.getElementById('progress-text').innerText = `${pct}%`;
+                document.getElementById('records-text').innerText = `${data.current_offset} / ${data.total} Records`;
+
+                // Update Status Badge
+                const badge = document.getElementById('status-badge');
+                badge.innerText = data.status.toUpperCase();
+
+                if (data.status === 'processing') {
+                    badge.className = "text-sm px-3 py-1 rounded-full bg-yellow-500/20 text-yellow-400 border border-yellow-500/50";
+                } else if (data.status === 'completed') {
+                    badge.className = "text-sm px-3 py-1 rounded-full bg-green-500/20 text-green-400 border border-green-500/50";
+                    stopPolling(); // Done
+                } else if (data.status === 'error') {
+                    badge.className = "text-sm px-3 py-1 rounded-full bg-red-500/20 text-red-400 border border-red-500/50";
+                    stopPolling(); // Error
+                } else {
+                    badge.className = "text-sm px-3 py-1 rounded-full bg-slate-700 text-slate-300";
+                }
+
+                // Append Log
+                if (data.last_log && data.last_log !== lastLogMsg) {
+                    const logWin = document.getElementById('log-window');
+                    // Simple logic: if new log is different, append it
+                    // Ideally backend sends list, but we sent single line for now in this simple implementation
+                    const line = document.createElement('div');
+                    line.className = "mb-1 border-b border-slate-800/50 pb-1";
+                    line.innerText = `[${new Date().toLocaleTimeString()}] ${data.last_log}`;
+                    logWin.appendChild(line);
+                    logWin.scrollTop = logWin.scrollHeight;
+                    lastLogMsg = data.last_log;
+                }
+
+            } catch (e) {
+                console.error("Status check failed", e);
+            }
+        }
+
+        let lastLogMsg = "";
+
+        async function startIngestion() {
+            const fileInput = document.getElementById('file-input');
+            if (!fileInput.files[0]) {
+                alert("Please select a file first.");
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append("file", fileInput.files[0]);
+
+            // Clear logs
+            const logWin = document.getElementById('log-window');
+            logWin.innerHTML = '<div class="text-yellow-500">Starting upload...</div>';
+            lastLogMsg = "";
+
+            try {
+                const res = await fetch(`${API_BASE}/api/ingest/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    const line = document.createElement('div');
+                    line.innerText = `File uploaded: ${data.file}. process started...`;
+                    logWin.appendChild(line);
+
+                    // Start Polling
+                    startPolling();
+                } else {
+                    alert("Upload failed.");
+                }
+            } catch (e) {
+                console.error(e);
+                alert("Error starting ingestion.");
+            }
+        }
+
+        function startPolling() {
+            if (pollingInterval) clearInterval(pollingInterval);
+            pollingInterval = setInterval(fetchStatus, 2000);
+            fetchStatus(); // immediate
+        }
+
+        function stopPolling() {
+            if (pollingInterval) clearInterval(pollingInterval);
+            pollingInterval = null;
+        }
+
+        // Poll immediately for Chroma Count on load
+        fetchStatus();
+    </script>
+</body>
+
+</html>

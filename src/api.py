@@ -1,21 +1,28 @@
 import logging
 import time
 from typing import List, Optional, Dict, Any
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import os
+import shutil
 import json
+import asyncio
 from datetime import datetime
 
 from src.search.engine import SmartSearchEngine
+from src.ingestion.pipeline import IngestionPipeline
 
+# Configure logging
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 app = FastAPI(title="Tender Search API", version="1.0")
+
+# Mount UI directory
+app.mount("/src/ui", StaticFiles(directory="src/ui"), name="ui")
 
 # CORS
 app.add_middleware(
@@ -33,6 +40,68 @@ try:
 except Exception as e:
     logging.error(f"Failed to initialize Search Engine: {e}")
     search_engine = None
+
+# Global Ingestion State
+ingestion_state = {
+    "status": "idle",
+    "progress": 0,
+    "total": 0,
+    "current_offset": 0,
+    "last_log": "",
+    "chroma_count": 0
+}
+
+async def run_ingestion_task(file_path: str):
+    global ingestion_state
+    ingestion_state["status"] = "processing"
+    
+    async def update_progress(data):
+        input_data = data # Capture data
+        ingestion_state["status"] = input_data["status"]
+        ingestion_state["current_offset"] = input_data["current"]
+        ingestion_state["total"] = input_data["total"]
+        ingestion_state["last_log"] = input_data["last_log"]
+        # Calculate progress %
+        if ingestion_state["total"] > 0:
+            ingestion_state["progress"] = round((ingestion_state["current_offset"] / ingestion_state["total"]) * 100, 1)
+        
+    try:
+        pipeline = IngestionPipeline(input_file=file_path, progress_callback=update_progress)
+        await pipeline.run()
+        ingestion_state["status"] = "completed"
+        ingestion_state["progress"] = 100
+    except Exception as e:
+        ingestion_state["status"] = "error"
+        ingestion_state["last_log"] = f"Error: {str(e)}"
+        logging.error(f"Ingestion Task Failed: {e}")
+
+# ... existing code ...
+
+@app.post("/api/ingest/upload")
+async def upload_ingest(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
+    # Save file
+    os.makedirs("temp_ingest", exist_ok=True)
+    file_path = f"temp_ingest/{file.filename}"
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+        
+    # Start Background Task
+    background_tasks.add_task(run_ingestion_task, file_path)
+    
+    return {"message": "Ingestion started", "file": file.filename}
+
+@app.get("/api/ingest/status")
+async def get_ingest_status():
+    global ingestion_state
+    
+    # Refresh Chroma Count (Simple approach)
+    # If search engine is available, use it
+    if search_engine and search_engine.collection:
+        ingestion_state["chroma_count"] = search_engine.collection.count()
+        
+    return ingestion_state
+
+
 
 class SearchRequest(BaseModel):
     query: str
