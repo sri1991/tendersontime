@@ -106,7 +106,7 @@ async def get_ingest_status():
 class SearchRequest(BaseModel):
     query: str
     limit: int = 100
-    include_corrigendum: bool = False
+    include_corrigendum: bool = True
 
 class ChatRequest(BaseModel):
     tender_id: str

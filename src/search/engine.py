@@ -105,7 +105,7 @@ class SmartSearchEngine:
             logging.error(f"Embedding failed: {e}")
             raise
 
-    async def search(self, query: str, k: int = 20, include_corrigendum: bool = False):
+    async def search(self, query: str, k: int = 20, include_corrigendum: bool = True):
         print(f"\n--- Searching for: '{query}' (Corrigendum: {include_corrigendum}) ---")
         
         # 1. Intent Analysis
