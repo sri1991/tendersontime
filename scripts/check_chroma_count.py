@@ -10,8 +10,8 @@ def count_records():
     collection_name = "tenders_v1"
     persist_directory = "./chroma_db"
     
-    chroma_host = os.getenv("CHROMA_HOST")
-    chroma_port = os.getenv("CHROMA_PORT")
+    chroma_host = "136.114.154.210"
+    chroma_port = "8002"
     
     if chroma_host and chroma_port:
         print(f"Connecting to ChromaDB Server at {chroma_host}:{chroma_port}...")

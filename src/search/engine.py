@@ -26,21 +26,18 @@ User Query: "{query}"
    - Allowed Domains: [Healthcare, Infrastructure, Energy, Defense, Technology, Transport, Agriculture, Other].
    - "Hospital Construction" -> Domain: "Healthcare" (Primary) AND "Infrastructure" (Secondary).
    - "Ear Tag" -> Domain: "Agriculture".
-
-2. **Procurement Type (Optional)**:
-   - "Construction", "Building" -> Works
-   - "Supply", "Purchase" -> Supply
-   - "Maintenance" -> Services
-
-3. **Refined Query**:
-   - Strip domain keywords to leave the semantic core if needed.
+   
+4. **Broad/Cross-Cutting Queries**:
+   - If the query is about a technology, product, or service applicable to MANY sectors (e.g., "Drones", "Computers", "Security Guards", "Vehicles"), marking it as "Technology" or "Transport" might exclude relevant results in "Agriculture" or "Defense".
+   - In such cases, set "is_broad_query": true.
 
 ## Output Schema
 Return JSON:
 {{
   "core_domains": ["Healthcare", "Infrastructure"], # List allowed broad domains.
   "procurement_types": ["Works", "Supply", "Services"],
-  "refined_query": "String"
+  "refined_query": "String",
+  "is_broad_query": boolean # True if query is generic/cross-cutting. False if specific.
 }}
 """
 
@@ -121,21 +118,27 @@ class SmartSearchEngine:
         # Simple case: if multiple domains, we might need $or, but Chroma's filter syntax is specific.
         # Start simple: Direct match if 1 domain, or $in if supported (Chroma > 0.4.x supports $in).
         
+        is_broad = intent.get("is_broad_query", False)
+        
         where_clause = {}
         conditions = []
         
-        if domains and len(domains) == 1:
-            conditions.append({"core_domain": domains[0]})
-        elif domains:
-            conditions.append({"core_domain": {"$in": domains}})
+        # Domain Filter: Only apply if NOT broad
+        if not is_broad and domains:
+            if len(domains) == 1:
+                conditions.append({"core_domain": domains[0]})
+            else:
+                conditions.append({"core_domain": {"$in": domains}})
             
         # Optional: Apply strict Type filter if detected?
         # Maybe safer to stick to Domain for the "Wall" unless query is specific.
         # Let's apply it if present to demonstrate precision.
-        if types and len(types) == 1:
-             conditions.append({"procurement_type": types[0]})
-        elif types:
-             conditions.append({"procurement_type": {"$in": types}})
+        # FIX: Also disable for broad queries to include "Unknown" types
+        if not is_broad and types:
+            if len(types) == 1:
+                 conditions.append({"procurement_type": types[0]})
+            else:
+                 conditions.append({"procurement_type": {"$in": types}})
              
         # Corrigendum Filter
         # If include_corrigendum is False, we EXCLUDE them (is_corrigendum != True)
