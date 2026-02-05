@@ -17,7 +17,8 @@ Use this mapping to identify specific `project_tags` that apply to this tender.
      [Agriculture, Healthcare, Infrastructure, Energy, Defense, Technology, Transport, Other].
    - **Project Tags**: Select 1-3 most relevant specific tags from the provided `keyword_mapping` (VALUES) if they match the tender content.
      - Example: If tender is "Ear Tags", `core_domain`="Agriculture", `project_tags`=["Animal Identification Ear Tags"].
-   - Assign a `procurement_type` from: [Works, Supply, Services, Consultancy].
+   - Assign a `procurement_type` from: [Works, Supply, Services].
+   - **Note**: "Consultancy" or "Hiring" should be mapped to "Services". "Construction" is "Works". "Purchase" is "Supply".
    - **CRITICAL**: Distinguish between "Hospital Construction" (Infrastructure) and "Medical Equipment" (Healthcare).
 
 2. **Semantic Expansion (The "Relatedness Map")**:

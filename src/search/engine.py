@@ -134,11 +134,13 @@ class SmartSearchEngine:
         # Maybe safer to stick to Domain for the "Wall" unless query is specific.
         # Let's apply it if present to demonstrate precision.
         # FIX: Also disable for broad queries to include "Unknown" types
-        if not is_broad and types:
-            if len(types) == 1:
-                 conditions.append({"procurement_type": types[0]})
-            else:
-                 conditions.append({"procurement_type": {"$in": types}})
+        # USER FEEDBACK (Step 622): "we should not restrict basis the procurement at this point"
+        # Disabling globally due to "Unknown" data quality issues.
+        # if not is_broad and types:
+        #    if len(types) == 1:
+        #         conditions.append({"procurement_type": types[0]})
+        #    else:
+        #         conditions.append({"procurement_type": {"$in": types}})
              
         # Corrigendum Filter
         # If include_corrigendum is False, we EXCLUDE them (is_corrigendum != True)
