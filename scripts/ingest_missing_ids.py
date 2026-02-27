@@ -15,13 +15,14 @@ load_dotenv()
 
 # Configuration
 CSV_PATH = "tender_dataset_06082025_6Jan2026.csv"
-CHROMA_HOST = "136.114.154.210"
-CHROMA_PORT = 8002
+CHROMA_HOST = os.getenv("CHROMA_HOST", "34.61.156.171")
+CHROMA_PORT = int(os.getenv("CHROMA_PORT", 8002))
 COLLECTION_NAME = "tenders_v1"
 
 # Target IDs to force ingest
 TARGET_IDS = [
-    "123998691", "123992377", "123987286", "123977391"
+    "124032274", "124031661", "124031569", "124029737",
+    "124029484", "124029458", "124029359", "124029077"
 ]
 
 async def ingest_missing():
@@ -77,7 +78,7 @@ async def ingest_missing():
             keywords = ", ".join(data.get("search_keywords", []))
             tags = ", ".join(data.get("project_tags", []))
             
-            embedding_text = f"{signal_text}. Tags: {tags}. Keywords: {keywords}"
+            embedding_text = f"{title}. {signal_text}. {desc[:1000]}. Tags: {tags}. Keywords: {keywords}"
             
             if not signal_text: continue
             

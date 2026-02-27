@@ -90,9 +90,9 @@ class TenderEnricher:
             return False
             
         # 2. Keyword Check (Fast fail)
-        # If text is reasonably long (>100 chars), we might give it a chance even without keywords?
+        # If text is reasonably long (>50 chars), we might give it a chance even without keywords?
         # But to be safe for cost, let's require at least ONE broad match if text is short-ish.
-        if len(text) < 100:
+        if len(text) < 50:
             # For short text, STRICTLY require a keyword match
             if not any(k in text for k in self.flat_keywords):
                 return False

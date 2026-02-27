@@ -15,6 +15,11 @@ Use this mapping to identify specific `project_tags` that apply to this tender.
 1. **Domain & Category Assignment**:
    - Assign a **BROAD** `core_domain` from this fixed list: 
      [Agriculture, Healthcare, Infrastructure, Energy, Defense, Technology, Transport, Other].
+   - **CRITICAL DOMAIN RULES**:
+     - Agricultural machinery (e.g., Tractors, Harvesters, Brush Cutters, Hedge Shears, Grass Cutters, Lawn Mowers, backhoes used in agriculture) MUST be mapped to "Agriculture".
+     - Parts/spares for agricultural machinery (e.g., Carbon bush for hand cutters, grass cutter wire) MUST be mapped to "Agriculture", NOT "Other" or "Technology".
+     - Animal feed, Hay, Fodder, veterinary supplies MUST be mapped to "Agriculture".
+     - Do not classify agriculture-related vehicles/equipment/tools as "Transport", "Infrastructure", or "Unclassified".
    - **Project Tags**: Select 1-3 most relevant specific tags from the provided `keyword_mapping` (VALUES) if they match the tender content.
      - Example: If tender is "Ear Tags", `core_domain`="Agriculture", `project_tags`=["Animal Identification Ear Tags"].
    - Assign a `procurement_type` from: [Works, Supply, Services].

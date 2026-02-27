@@ -4,6 +4,7 @@
 A high-precision, AI-powered Tender Search Engine designed to process 80,000+ tenders daily. It leverages **Multimodal Enrichment (Gemini 2.5)** and **Vector Search (ChromaDB)** to deliver accurate, context-aware results significantly cheaper than traditional methods.
 
 ---
+- **[System Documentation](SYSTEM_DOCUMENTATION.md)**: Comprehensive guide to the implementation, including ingestion logic, search algorithms, and debugging workflows.
 
 ## 🏗️ System Architecture & Workflow
 
@@ -112,7 +113,7 @@ Based on live ingestion metrics (Jan 2026):
 
 2.  **Start the Search Server**
     ```bash
-    venv/bin/python -m uvicorn src.api:app --reload --port 8000
+    venv/bin/python -m uvicorn src.api:app --reload --host 0.0.0.0 --port 8000
     ```
 
 3.  **Access UI**
@@ -231,7 +232,7 @@ graph TD
 
 1.  **Start the Server**
     ```bash
-    venv/bin/python -m uvicorn src.api:app --reload --port 8000
+    venv/bin/python -m uvicorn src.api:app --reload --host 0.0.0.0 --port 8000
     ```
 2.  **Open in Browser**
     Go to `http://localhost:8000`

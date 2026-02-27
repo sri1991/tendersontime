@@ -153,8 +153,10 @@ class SmartSearchEngine:
         elif len(conditions) == 1:
             where_clause = conditions[0]
         else:
-            where_clause = None # No restrictions
+            where_clause = None
             
+        print(f"DEBUG: Active Where Clause: {json.dumps(where_clause, indent=2)}")
+        
         print(f"DEBUG: Vector Filter: {where_clause}")
         
         # 3. Vector Search

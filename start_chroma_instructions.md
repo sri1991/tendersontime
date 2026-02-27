@@ -15,7 +15,7 @@ source venv/bin/activate
 Replace `/full/path/to/your/chroma_db` with the actual absolute path to your data directory.
 
 ```bash
-nohup chroma run --path /full/path/to/your/chroma_db --port 8000 --host 0.0.0.0 > chroma.log 2>&1 &
+nohup chroma run --path chroma_db --port 8002 --host 0.0.0.0 > chroma.log 2>&1 &
 ```
 
 ### 4. Verify it's Running

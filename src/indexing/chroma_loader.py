@@ -109,7 +109,11 @@ class ChromaLoader:
                     tags = ", ".join(data.get("project_tags", []))
                     
                     # Augmented text for better retrieval
-                    embedding_text = f"{signal_text}. Tags: {tags}. Keywords: {keywords}"
+                    title_text = data.get("Title") or data.get("Summary") or ""
+                    desc_text = data.get("Description") or ""
+                    
+                    # Include Title + Signal + Description (Truncated)
+                    embedding_text = f"{title_text}. {signal_text}. {desc_text[:1000]}. Tags: {tags}. Keywords: {keywords}"
                     
                     if not signal_text:
                         logging.warning(f"Skipping record with empty signal_summary: {data}")
