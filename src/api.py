@@ -181,43 +181,43 @@ async def search_tenders(request: SearchRequest):
         metadatas = results.get("metadatas", [[]])[0]
         distances = results.get("distances", [[]])[0]
         
+        def get_score(d):
+            """Converts cosine distance to a relevance score.
+            Distance scale: 0.5 = perfect, 0.7 = strong, 0.9 = ok, 1.1 = weak, 1.3+ = irrelevant."""
+            if d <= 0.5: return 1.0
+            if d <= 0.7: return 1.0 - (0.15 * (d - 0.5) / 0.2)  # 1.0 -> 0.85
+            if d <= 0.9: return 0.85 - (0.30 * (d - 0.7) / 0.2) # 0.85 -> 0.55
+            if d <= 1.1: return 0.55 - (0.30 * (d - 0.9) / 0.2) # 0.55 -> 0.25
+            if d <= 1.3: return 0.25 - (0.25 * (d - 1.1) / 0.2) # 0.25 -> 0.0
+            return 0.0
+
         for i, tender_id in enumerate(ids):
             meta = metadatas[i] if i < len(metadatas) else {}
-            # Chroma returns distance. For Cosine/L2, lower is better.
-            # We convert to a 'match score' relative to a threshold.
-            # Assuming distance ranges ~0.5 (good) to ~1.0 (bad) for this model.
-            dist = distances[i]
-            # Calibrated Scoring using Piecewise Linear Mapping for text-embedding-004
-            # Dist 0.5 -> 100%
-            # Dist 0.7 -> 90% (Strong Semantic Match)
-            # Dist 0.9 -> 60% (Broad Context)
-            # Dist 1.1 -> 20% (Weak)
-            # Dist 1.2 -> 0%
-            
-            def get_score(d):
-                if d <= 0.5: return 1.0
-                if d <= 0.7: return 1.0 - (0.1 * (d - 0.5) / 0.2) # 1.0 -> 0.9
-                if d <= 0.9: return 0.9 - (0.3 * (d - 0.7) / 0.2) # 0.9 -> 0.6
-                if d <= 1.1: return 0.6 - (0.4 * (d - 0.9) / 0.2) # 0.6 -> 0.2
-                if d <= 1.2: return 0.2 - (0.2 * (d - 1.1) / 0.1) # 0.2 -> 0.0
-                return 0.0
+            dist = distances[i] if i < len(distances) else 1.5
 
             score = get_score(dist)
+            
+            # Skip results that have effectively zero relevance
+            if score == 0.0:
+                continue
             score_pct = round(score * 100, 1)
             
             # Determine Label and Color
             if score >= 0.85:
                 label = "Excellent Match"
-                color = "green" # UI class
+                color = "green"
             elif score >= 0.65:
                 label = "Strong Match"
                 color = "teal"
             elif score >= 0.45:
                 label = "Good Match"
                 color = "yellow"
-            else:
+            elif score >= 0.20:
                 label = "Potential Lead"
                 color = "gray"
+            else:
+                label = "Weak Lead"
+                color = "lightgray"
             
             processed_results.append({
                 "id": tender_id,

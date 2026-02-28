@@ -325,6 +325,13 @@ class SmartSearchEngine:
         # Map for quick lookup
         records_map = {id: (meta, doc) for id, meta, doc in zip(final_records["ids"], final_records["metadatas"], final_records["documents"])}
         
+        # Map for quick lookup of vector distances
+        distance_map = {}
+        vector_ids_list = vector_results["ids"][0]
+        vector_dists_list = vector_results.get("distances", [[]])[0]
+        for vid, vdist in zip(vector_ids_list, vector_dists_list):
+            distance_map[vid] = vdist
+
         final_ids = []
         final_metas = []
         final_docs = []
@@ -343,8 +350,8 @@ class SmartSearchEngine:
             final_ids.append(tid)
             final_metas.append(meta)
             final_docs.append(doc)
-            # We don't have a single "distance" anymore, could put RRF score here if needed
-            final_dists.append(0.0) 
+            # Preserve real cosine distance if available, else use a moderate default for BM25-only hits
+            final_dists.append(distance_map.get(tid, 0.85))
             
             if len(final_ids) >= fetch_k: # Fetching more for re-ranking
                 break
@@ -372,15 +379,10 @@ class SmartSearchEngine:
         # Final take k
         final_take_k = final_ordered_results[:k]
             
-        # Generate pseudo-distances based on rank (to avoid all 100% scores)
-        # We start at 0.5 (100%) and increase slightly per rank (decaying score)
-        # Score calculation in api.py: if d <= 0.5: return 1.0; 0.5 -> 0.7 mapping uses linear decay.
-        take_k_dists = [0.50 + (i * 0.02) for i in range(len(final_take_k))]
-
         return {
             "ids": [[res["id"] for res in final_take_k]],
             "metadatas": [[res["metadata"] for res in final_take_k]],
-            "distances": [take_k_dists],
+            "distances": [[res["score"] for res in final_take_k]],  # Real cosine distances
             "documents": [[res["document"] for res in final_take_k]]
         }
 
