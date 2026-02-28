@@ -10,6 +10,7 @@ from src.cleaning.cleaner import CurrencyNormalizer, DateStandardizer, Deduplica
 
 load_dotenv()
 from src.enrichment.prompts import ENRICHMENT_PROMPT, STATIC_SYSTEM_PROMPT_TEMPLATE, TENDER_USER_PROMPT_TEMPLATE
+from src.models.taxonomy import CoreDomain, ProcurementType
 import datetime
 from google.generativeai import caching
 
@@ -78,6 +79,50 @@ class TenderEnricher:
             
         logging.info(f"Pre-Filter initialized with {len(self.flat_keywords)} keywords.")
 
+        # Hashing + Caching Layer
+        self.cache_dir = "data/enrichment_cache"
+        os.makedirs(self.cache_dir, exist_ok=True)
+        self.cache_file = os.path.join(self.cache_dir, "cache.json")
+        self.local_cache = self._load_local_cache()
+
+    def _load_local_cache(self) -> Dict[str, Any]:
+        if os.path.exists(self.cache_file):
+            try:
+                with open(self.cache_file, 'r') as f:
+                    return json.load(f)
+            except Exception as e:
+                logging.warning(f"Failed to load local cache: {e}")
+        return {}
+
+    def _save_local_cache(self):
+        try:
+            with open(self.cache_file, 'w') as f:
+                json.dump(self.local_cache, f)
+        except Exception as e:
+            logging.warning(f"Failed to save local cache: {e}")
+
+    def _get_text_hash(self, text: str) -> str:
+        import hashlib
+        return hashlib.sha256(text.encode('utf-8')).hexdigest()
+
+    def validate_enrichment(self, enrichment: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Validates and fixes enrichment data against the taxonomy.
+        """
+        # Validate Core Domain
+        domain = enrichment.get("core_domain")
+        if domain not in [d.value for d in CoreDomain]:
+            logging.warning(f"Invalid core_domain '{domain}'. Resetting to 'Other'.")
+            enrichment["core_domain"] = CoreDomain.OTHER.value
+        
+        # Validate Procurement Type
+        p_type = enrichment.get("procurement_type")
+        if p_type not in [p.value for p in ProcurementType]:
+            logging.warning(f"Invalid procurement_type '{p_type}'. Resetting to 'Unknown'.")
+            enrichment["procurement_type"] = ProcurementType.UNKNOWN.value
+            
+        return enrichment
+
     def _should_enrich(self, title: str, description: str) -> bool:
         """
         Strategy B: Cost Optimization.
@@ -118,6 +163,13 @@ class TenderEnricher:
                 "note": "Skipped by Cost Optimizer (Pre-Filter)"
             }
         
+        # Strategy C: Semantic Caching
+        text_to_hash = f"{title}\n{desc_text}"
+        text_hash = self._get_text_hash(text_to_hash)
+        if text_hash in self.local_cache:
+            logging.info(f"Cache HIT for: {title[:30]}...")
+            return self.local_cache[text_hash]
+
         # Select Prompt based on Cache Status
         if self.use_cache:
             # We only send the dynamic part, system prompt is cached
@@ -149,7 +201,13 @@ class TenderEnricher:
             elif response_text.startswith("```"):
                 response_text = response_text[3:-3]
                 
-            return json.loads(response_text)
+            result = json.loads(response_text)
+            
+            # Save to cache
+            self.local_cache[text_hash] = result
+            self._save_local_cache()
+            
+            return result
             
         except Exception as e:
             logging.error(f"Error enriching tender '{title}': {e}")
@@ -163,23 +221,134 @@ class TenderEnricher:
                 "error": str(e)
             }
 
+    async def enrich_batch_genai(self, batch_data: List[Dict[str, str]]) -> List[Dict[str, Any]]:
+        """
+        Sends a batch of 10-20 tenders to Gemini in a single prompt.
+        """
+        if not batch_data:
+            return []
+
+        # Construct a combined prompt for the batch
+        batch_items_str = ""
+        for i, item in enumerate(batch_data):
+            batch_items_str += f"--- TENDER {i} ---\nTitle: {item['title']}\nDescription: {item['description']}\n\n"
+
+        batch_prompt = f"""
+        Analyze the following batch of {len(batch_data)} tenders. 
+        Return a JSON ARRAY of objects, each following the specified schema.
+        Ensure the order in the array matches the order in the input.
+
+        BATCH DATA:
+        {batch_items_str}
+        """
+
+        if self.use_cache:
+            # Note: For batching, we might need a different system prompt or just append.
+            # Using standard prompt for now to ensure schema compliance.
+            prompt = batch_prompt
+        else:
+            prompt = ENRICHMENT_PROMPT.format(
+                title="BATCH PROCESSING", 
+                description=batch_prompt, 
+                keyword_mapping=self.keywords_str
+            )
+
+        config = genai.types.GenerationConfig(
+            temperature=0.1, 
+            response_mime_type="application/json",
+        )
+
+        try:
+            response = await self.model.generate_content_async(
+                prompt,
+                generation_config=config
+            )
+            
+            response_text = response.text.strip()
+            if response_text.startswith("```json"):
+                response_text = response_text[7:-3]
+            elif response_text.startswith("```"):
+                response_text = response_text[3:-3]
+                
+            results = json.loads(response_text)
+            if not isinstance(results, list):
+                logging.error("Batch response is not a list. Attempting to wrap.")
+                results = [results]
+            
+            # Validate each item
+            validated_results = [self.validate_enrichment(res) if res else None for res in results]
+            return validated_results
+        except Exception as e:
+            logging.error(f"Batch enrichment failed: {e}")
+            return [None] * len(batch_data)
+
     async def process_batch(self, tenders_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
-        Process a list of dictionaries (rows).
+        Process a list of dictionaries (rows) with caching and batching.
         """
-        tasks = []
-        for row in tenders_data:
-            # TITLE MAPPING: Use 'Summary' as Title
+        results = [None] * len(tenders_data)
+        to_enrich_indices = []
+        to_enrich_data = []
+
+        # 1. Check Cache and Pre-Filter
+        for i, row in enumerate(tenders_data):
             title = row.get("Summary") or row.get("Title") or ""
-            tasks.append(self.enrich_tender(title, row.get("Description", "")))
+            description = row.get("Description") or ""
+            
+            # Pre-Filter
+            if not self._should_enrich(title, description):
+                results[i] = {
+                    "core_domain": "Unclassified",
+                    "project_tags": [],
+                    "procurement_type": "Unknown",
+                    "search_keywords": [],
+                    "entities": {},
+                    "signal_summary": title,
+                    "note": "Skipped by Cost Optimizer (Pre-Filter)"
+                }
+                continue
+
+            # Cache Check
+            text_to_hash = f"{title}\n{description}"
+            text_hash = self._get_text_hash(text_to_hash)
+            if text_hash in self.local_cache:
+                results[i] = self.local_cache[text_hash]
+                continue
+
+            # If not in cache and passed filter, add to batch
+            to_enrich_indices.append(i)
+            to_enrich_data.append({"title": title, "description": description, "hash": text_hash})
+
+        # 2. Process Batch in chunks of 10
+        batch_size = 10
+        for i in range(0, len(to_enrich_data), batch_size):
+            chunk = to_enrich_data[i:i+batch_size]
+            chunk_indices = to_enrich_indices[i:i+batch_size]
+            
+            logging.info(f"Enriching batch chunk of {len(chunk)}...")
+            enriched_chunk = await self.enrich_batch_genai(chunk)
+            
+            for j, res in enumerate(enriched_chunk):
+                idx = chunk_indices[j]
+                if res:
+                    results[idx] = res
+                    # Update cache
+                    self.local_cache[chunk[j]['hash']] = res
+                else:
+                    # Fallback to single if batch item failed? 
+                    # For simplicity, just return default
+                    results[idx] = {
+                        "core_domain": "Unclassified",
+                        "signal_summary": chunk[j]['title'],
+                        "error": "Batch enrichment failed for this item"
+                    }
         
-        results = await asyncio.gather(*tasks)
-        
+        self._save_local_cache()
+
         enriched_rows = []
         for original, result in zip(tenders_data, results):
-            # Merge original data with enrichment result
             merged = original.copy()
-            merged.update(result)
+            merged.update(result if result else {})
             enriched_rows.append(merged)
             
         return enriched_rows

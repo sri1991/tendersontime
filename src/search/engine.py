@@ -62,6 +62,113 @@ class SmartSearchEngine:
             self.client = chromadb.PersistentClient(path=persist_directory)
 
         self.collection = self.client.get_or_create_collection("tenders_v1")
+        self.bm25 = None
+        self.bm25_ids = []
+        self._initialize_bm25()
+
+    def _initialize_bm25(self):
+        """
+        Loads all documents from ChromaDB and creates a BM25 index.
+        Note: For very large collections, this should be done incrementally or via a persistent BM25 store.
+        """
+        try:
+            count = self.collection.count()
+            if count == 0:
+                logging.info("ChromaDB is empty. BM25 index not initialized.")
+                return
+
+            # Fetch all documents (id and text)
+            # Fetching in one go if count is reasonable, else should batch.
+            results = self.collection.get(include=["documents"])
+            self.bm25_ids = results["ids"]
+            documents = results["documents"]
+
+            if not documents:
+                logging.warning("No documents found in ChromaDB to index for BM25.")
+                return
+
+            from rank_bm25 import BM25Okapi
+            tokenized_corpus = [doc.lower().split() for doc in documents]
+            self.bm25 = BM25Okapi(tokenized_corpus)
+            logging.info(f"BM25 Index initialized with {len(documents)} documents.")
+        except Exception as e:
+            logging.error(f"Failed to initialize BM25: {e}")
+
+    def _reciprocal_rank_fusion(self, vector_results: List[str], bm25_results: List[str], k=60) -> List[tuple]:
+        """
+        Combines results from vector search and BM25 using RRF.
+        Returns list of (id, score) sorted by score descending.
+        """
+        scores = {}
+        for rank, doc_id in enumerate(vector_results):
+            scores[doc_id] = scores.get(doc_id, 0) + 1 / (k + rank)
+        for rank, doc_id in enumerate(bm25_results):
+            scores[doc_id] = scores.get(doc_id, 0) + 1 / (k + rank)
+        
+        return sorted(scores.items(), key=lambda x: x[1], reverse=True)
+
+    async def re_rank(self, query: str, results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Re-ranks top results using Gemini-2.0-flash.
+        """
+        if not results:
+            return []
+
+        # Prepare candidates for re-ranking
+        candidates = []
+        for i, res in enumerate(results):
+            candidates.append({
+                "index": i,
+                "title": res.get("original_title", ""),
+                "summary": res.get("description", "")[:200] # Limit summary length
+            })
+
+        re_rank_prompt = f"""
+        You are a Re-ranking Assistant for a Tender Search Engine.
+        User Query: "{query}"
+
+        Below are the top {len(candidates)} candidates fetched by the vector engine.
+        Re-rank them based on their relevance to the user's intent.
+        Return a JSON array of indices in order of decreasing relevance.
+
+        CANDIDATES:
+        {json.dumps(candidates, indent=2)}
+
+        OUTPUT:
+        [index1, index2, index3, ...]
+        """
+
+        try:
+            response = await self.client_genai.aio.models.generate_content(
+                model="gemini-2.0-flash",
+                contents=re_rank_prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    temperature=0.0
+                )
+            )
+            
+            re_ranked_indices = json.loads(response.text.strip())
+            if not isinstance(re_ranked_indices, list):
+                return results
+
+            # Reorder results
+            final_results = []
+            seen_indices = set()
+            for idx in re_ranked_indices:
+                if isinstance(idx, (int, float)) and 0 <= int(idx) < len(results) and int(idx) not in seen_indices:
+                    final_results.append(results[int(idx)])
+                    seen_indices.add(int(idx))
+            
+            # Add any missed results to the end
+            for i in range(len(results)):
+                if i not in seen_indices:
+                    final_results.append(results[i])
+
+            return final_results
+        except Exception as e:
+            logging.error(f"Re-ranking failed: {e}")
+            return results
         
     async def analyze_intent(self, query: str) -> Dict[str, Any]:
         """
@@ -162,54 +269,99 @@ class SmartSearchEngine:
         # 3. Vector Search
         query_vec = self.get_embedding(refined_query)
         
-        # Fetch slightly more to account for post-filtering
-        fetch_k = k * 2 if not include_corrigendum else k
+        # Fetch slightly more for hybrid fusion
+        fetch_k = k * 3 
         
-        results = self.collection.query(
+        vector_results = self.collection.query(
             query_embeddings=[query_vec],
             n_results=fetch_k,
             where=where_clause,
             include=["metadatas", "documents", "distances"]
         )
         
-        # 4. Runtime Guardrail: Filter by Title text if metadata failed
-        # Many old records have is_corrigendum=False but title="Corrigendum: ..."
-        if not include_corrigendum:
-            final_ids = []
-            final_metas = []
-            final_dists = []
-            final_docs = []
+        # 4. Keyword Search (BM25)
+        bm25_top_ids = []
+        if self.bm25:
+            tokenized_query = refined_query.lower().split()
+            # Get scores for all docs
+            doc_scores = self.bm25.get_scores(tokenized_query)
+            # Pair scores with IDs and sort
+            id_scores = sorted(zip(self.bm25_ids, doc_scores), key=lambda x: x[1], reverse=True)
+            # Filter by fetch_k
+            bm25_top_ids = [item[0] for item in id_scores[:fetch_k] if item[1] > 0]
+
+        # 5. Hybrid Fusion (RRF)
+        vector_ids = vector_results["ids"][0]
+        combined_results = self._reciprocal_rank_fusion(vector_ids, bm25_top_ids)
+        
+        # Take top k
+        top_k_ids = [res[0] for res in combined_results[:k]]
+        
+        # 6. Fetch full metadata for top_k_ids
+        if not top_k_ids:
+             return {"ids": [[]], "metadatas": [[]], "distances": [[]], "documents": [[]]}
+
+        # Since we need to maintain order from top_k_ids, we fetch and then re-sort
+        final_records = self.collection.get(
+            ids=top_k_ids,
+            include=["metadatas", "documents"]
+        )
+        
+        # Map for quick lookup
+        records_map = {id: (meta, doc) for id, meta, doc in zip(final_records["ids"], final_records["metadatas"], final_records["documents"])}
+        
+        final_ids = []
+        final_metas = []
+        final_docs = []
+        final_dists = [] # Distances might be lost or need mapping, for now using dummy or RRF score
+        
+        # 7. Runtime Guardrail: Corrigendum Filter
+        for tid in top_k_ids:
+            if tid not in records_map: continue
+            meta, doc = records_map[tid]
             
-            # Chroma results are lists of lists [[]]
-            r_ids = results["ids"][0]
-            r_metas = results["metadatas"][0]
-            r_dists = results["distances"][0]
-            r_docs = results["documents"][0] if results.get("documents") else []
-            
-            for i in range(len(r_ids)):
-                title = r_metas[i].get("original_title", "").lower()
-                summary = r_metas[i].get("description", "").lower() # Check description too?
-                
-                # STRING CHECK:
+            if not include_corrigendum:
+                title = meta.get("original_title", "").lower()
                 if "corrigendum" in title:
-                    # Skip it
                     continue
-                    
-                final_ids.append(r_ids[i])
-                final_metas.append(r_metas[i])
-                final_dists.append(r_dists[i])
-                if r_docs: final_docs.append(r_docs[i])
-                
-                if len(final_ids) >= k:
-                    break
             
-            # Reconstruct result format
-            results["ids"] = [final_ids]
-            results["metadatas"] = [final_metas]
-            results["distances"] = [final_dists]
-            if r_docs: results["documents"] = [final_docs]
+            final_ids.append(tid)
+            final_metas.append(meta)
+            final_docs.append(doc)
+            # We don't have a single "distance" anymore, could put RRF score here if needed
+            final_dists.append(0.0) 
             
-        return results
+            if len(final_ids) >= fetch_k: # Fetching more for re-ranking
+                break
+        
+        # 8. Two-Stage Re-ranking
+        # Convert to list of dicts for re-ranker
+        results_to_rerank = []
+        for i in range(len(final_ids)):
+            results_to_rerank.append({
+                "id": final_ids[i],
+                "original_title": final_metas[i].get("original_title"),
+                "description": final_metas[i].get("description"),
+                "metadata": final_metas[i],
+                "document": final_docs[i]
+            })
+        
+        # Only re-rank top 50
+        candidates_to_rerank = results_to_rerank[:50]
+        remaining_results = results_to_rerank[50:]
+        
+        re_ranked_top = await self.re_rank(query, candidates_to_rerank)
+        final_ordered_results = re_ranked_top + remaining_results
+
+        # Final take k
+        final_take_k = final_ordered_results[:k]
+            
+        return {
+            "ids": [[res["id"] for res in final_take_k]],
+            "metadatas": [[res["metadata"] for res in final_take_k]],
+            "distances": [[0.0] * len(final_take_k)],
+            "documents": [[res["document"] for res in final_take_k]]
+        }
 
     async def chat_with_tender(self, tender_id: str, query: str) -> str:
         """

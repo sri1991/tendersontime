@@ -22,7 +22,7 @@ Use this mapping to identify specific `project_tags` that apply to this tender.
      - Do not classify agriculture-related vehicles/equipment/tools as "Transport", "Infrastructure", or "Unclassified".
    - **Project Tags**: Select 1-3 most relevant specific tags from the provided `keyword_mapping` (VALUES) if they match the tender content.
      - Example: If tender is "Ear Tags", `core_domain`="Agriculture", `project_tags`=["Animal Identification Ear Tags"].
-   - Assign a `procurement_type` from: [Works, Supply, Services].
+   - Assign a `procurement_type` from this fixed list: [Works, Supply, Services, Unknown].
    - **Note**: "Consultancy" or "Hiring" should be mapped to "Services". "Construction" is "Works". "Purchase" is "Supply".
    - **CRITICAL**: Distinguish between "Hospital Construction" (Infrastructure) and "Medical Equipment" (Healthcare).
 

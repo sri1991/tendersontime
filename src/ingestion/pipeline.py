@@ -184,9 +184,9 @@ class IngestionPipeline:
                     os.remove(output_file)
                     
                 try:
-                    # process_csv_to_jsonl(input_csv, output_jsonl, batch_size=50, limit=None, offset=0)
-                    # Note: process_csv_to_jsonl uses 'skiprows=range(1, offset+1)' and 'nrows=limit'
-                    # So passing offset=offset and limit=chunk_size is correct mapping.
+                    # DELTA-SYNC: We check if the chunk needs processing.
+                    # Since we are batching, we will let the enricher handle hashing/caching.
+                    # But we can also check if the loader already has these IDs.
                     
                     logging.info(f"Processing chunk offset={offset}, limit={limit}")
                     
