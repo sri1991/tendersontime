@@ -124,17 +124,23 @@ class SmartSearchEngine:
             })
 
         re_rank_prompt = f"""
-        You are a Re-ranking Assistant for a Tender Search Engine.
+        You are a highly-critical Search Re-ranking Assistant for a Tender Search Engine.
         User Query: "{query}"
 
         Below are the top {len(candidates)} candidates fetched by the vector engine.
-        Re-rank them based on their relevance to the user's intent.
-        Return a JSON array of indices in order of decreasing relevance.
+        Your job is to re-rank them based on their direct relevance to the user's intent.
+        
+        CRITICAL RULES:
+        1. Direct matches to query keywords (e.g. "CCTV", "RFID", "Video Surveillance") must be at the very top.
+        2. Related but distinct services (e.g. "Locksmith", "Construction", "Plumbing") should be ranked much lower, even if they share a broad 'Security' or 'Infrastructure' context.
+        3. If multiple items are equally relevant, prioritize by specificity of title.
+        4. Return a JSON array of the indices of the most relevant items in decreasing order of relevance.
+        5. IGNORE candidates that are completely irrelevant.
 
         CANDIDATES:
         {json.dumps(candidates, indent=2)}
 
-        OUTPUT:
+        OUTPUT FORMAT:
         [index1, index2, index3, ...]
         """
 
@@ -152,18 +158,27 @@ class SmartSearchEngine:
             if not isinstance(re_ranked_indices, list):
                 return results
 
-            # Reorder results
+            # Reorder results - only include what LLM thinks is relevant
             final_results = []
             seen_indices = set()
             for idx in re_ranked_indices:
-                if isinstance(idx, (int, float)) and 0 <= int(idx) < len(results) and int(idx) not in seen_indices:
-                    final_results.append(results[int(idx)])
-                    seen_indices.add(int(idx))
+                try:
+                    i = int(idx)
+                    if 0 <= i < len(results) and i not in seen_indices:
+                        final_results.append(results[i])
+                        seen_indices.add(i)
+                except (ValueError, TypeError):
+                    continue
             
-            # Add any missed results to the end
-            for i in range(len(results)):
-                if i not in seen_indices:
-                    final_results.append(results[i])
+            # If the LLM returned too few results, or if we want to be safe, 
+            # we can append the rest but maybe we should just trust the LLM 
+            # if it returned at least a few.
+            if len(final_results) < 5 and len(results) > 5:
+                # Add some back to fill the list if it's too empty
+                for i in range(len(results)):
+                    if i not in seen_indices and len(final_results) < 20:
+                        final_results.append(results[i])
+                        seen_indices.add(i)
 
             return final_results
         except Exception as e:
@@ -343,7 +358,8 @@ class SmartSearchEngine:
                 "original_title": final_metas[i].get("original_title"),
                 "description": final_metas[i].get("description"),
                 "metadata": final_metas[i],
-                "document": final_docs[i]
+                "document": final_docs[i],
+                "score": final_dists[i] # This is either RRF score or 1.0 (if vector-only)
             })
         
         # Only re-rank top 50
@@ -356,10 +372,15 @@ class SmartSearchEngine:
         # Final take k
         final_take_k = final_ordered_results[:k]
             
+        # Generate pseudo-distances based on rank (to avoid all 100% scores)
+        # We start at 0.5 (100%) and increase slightly per rank (decaying score)
+        # Score calculation in api.py: if d <= 0.5: return 1.0; 0.5 -> 0.7 mapping uses linear decay.
+        take_k_dists = [0.50 + (i * 0.02) for i in range(len(final_take_k))]
+
         return {
             "ids": [[res["id"] for res in final_take_k]],
             "metadatas": [[res["metadata"] for res in final_take_k]],
-            "distances": [[0.0] * len(final_take_k)],
+            "distances": [take_k_dists],
             "documents": [[res["document"] for res in final_take_k]]
         }
 
