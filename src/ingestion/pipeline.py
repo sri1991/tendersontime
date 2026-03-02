@@ -7,6 +7,7 @@ import json
 from tqdm import tqdm
 from src.enrichment.processor import TenderEnricher
 from src.indexing.chroma_loader import ChromaLoader
+from src.db.postgres_loader import PostgresLoader
 
 # Configure logging to show up in standard output
 logging.basicConfig(
@@ -52,7 +53,13 @@ class IngestionPipeline:
 
         # Initialize components
         self.enricher = TenderEnricher(api_key=self.api_key)
-        self.loader = ChromaLoader(api_key=self.api_key)
+
+        # Use postgres_loader as primary; chroma_loader kept for backward compat
+        search_backend = os.getenv("SEARCH_BACKEND", "postgres")
+        if search_backend == "postgres":
+            self.loader = PostgresLoader(api_key=self.api_key)
+        else:
+            self.loader = ChromaLoader(api_key=self.api_key)
         
         # Determine total records if not provided
         if self.total_records is None:
@@ -94,6 +101,43 @@ class IngestionPipeline:
                 logging.warning(f"Failed to load checkpoint: {e}")
         
         return requested_offset
+
+    async def _record_chunk_failure(self, offset: int, limit: int, error: str):
+        """
+        Records a failed ingestion chunk to the dead letter queue.
+        Falls back to a local JSONL file if the DB is unavailable.
+        """
+        entry = {
+            "chunk_offset": offset,
+            "chunk_limit": limit,
+            "error": error,
+            "file": self.working_csv_file,
+            "timestamp": __import__("time").time(),
+        }
+        try:
+            from sqlalchemy import text
+            from src.db.schema import engine as db_engine
+            async with db_engine.begin() as conn:
+                await conn.execute(
+                    text(
+                        "INSERT INTO ingestion_dlq (tender_id, raw_data, error) "
+                        "VALUES (:tender_id, :raw_data::jsonb, :error)"
+                    ),
+                    {
+                        "tender_id": f"chunk_{offset}_{offset+limit}",
+                        "raw_data": __import__("json").dumps(entry),
+                        "error": error,
+                    },
+                )
+            logging.info(f"Chunk failure recorded in DLQ: offset={offset}")
+        except Exception as db_err:
+            logging.warning(f"DLQ DB write failed ({db_err}). Falling back to file DLQ.")
+            try:
+                os.makedirs("data", exist_ok=True)
+                with open("data/ingestion_dlq.jsonl", "a") as f:
+                    f.write(__import__("json").dumps(entry) + "\n")
+            except Exception as fe:
+                logging.error(f"File DLQ write also failed: {fe}")
 
     def _save_checkpoint(self, offset: int):
         """
@@ -209,14 +253,21 @@ class IngestionPipeline:
                         break
                     
                     # 2. Indexing
-                    self.loader.load_from_jsonl(output_file)
-                    
+                    if hasattr(self.loader, 'load_from_jsonl'):
+                        # PostgresLoader is async; ChromaLoader is sync
+                        import asyncio, inspect
+                        if inspect.iscoroutinefunction(self.loader.load_from_jsonl):
+                            await self.loader.load_from_jsonl(output_file)
+                        else:
+                            self.loader.load_from_jsonl(output_file)
+
                     # Cleanup
                     os.remove(output_file)
 
                 except Exception as e:
                     logging.error(f"Pipeline failed at chunk {offset}: {e}")
-                    # In production, we might want to store failed chunks in a DLQ
+                    # Write failed chunk info to DLQ
+                    await self._record_chunk_failure(offset, limit, str(e))
                     continue
                 
                 chunk_duration = time.time() - chunk_start_time

@@ -6,7 +6,6 @@ import logging
 from typing import List, Dict, Any
 import chromadb
 from chromadb.config import Settings
-import google.generativeai as genai # Keep for other files potentially? No, new SDK.
 from google import genai
 from google.genai import types
 

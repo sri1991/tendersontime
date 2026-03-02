@@ -1,7 +1,7 @@
 import logging
 import time
 from typing import List, Optional, Dict, Any
-from fastapi import FastAPI, HTTPException, Request, UploadFile, File, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File, BackgroundTasks, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -127,8 +127,70 @@ async def read_index():
     return FileResponse('src/ui/index.html')
 
 @app.get("/health")
-def health_check():
-    return {"status": "ok"}
+async def health_check():
+    """Extended health check — reports status of DB, Redis, and search engine."""
+    status: Dict[str, Any] = {"status": "ok"}
+
+    # Check PostgreSQL
+    try:
+        from sqlalchemy import text
+        from src.db.schema import engine as db_engine
+        async with db_engine.connect() as conn:
+            row = await conn.execute(text("SELECT COUNT(*) FROM tenders"))
+            count = row.scalar()
+        status["postgres"] = {"status": "ok", "tender_count": count}
+    except Exception as e:
+        status["postgres"] = {"status": "error", "detail": str(e)}
+        status["status"] = "degraded"
+
+    # Check Redis intent cache
+    try:
+        if search_engine and search_engine.intent_cache:
+            redis_ok = await search_engine.intent_cache.ping()
+            status["redis"] = {"status": "ok" if redis_ok else "unavailable"}
+        else:
+            status["redis"] = {"status": "not_initialised"}
+    except Exception as e:
+        status["redis"] = {"status": "error", "detail": str(e)}
+
+    # BM25 index
+    if search_engine:
+        status["bm25"] = {
+            "ready": search_engine.bm25_store.is_ready,
+            "doc_count": search_engine.bm25_store.doc_count,
+        }
+
+    return status
+
+
+@app.get("/api/dlq")
+async def get_dlq(limit: int = Query(50, le=500), offset: int = Query(0, ge=0)):
+    """Returns recent Dead Letter Queue entries for failed ingestion records."""
+    try:
+        from sqlalchemy import text
+        from src.db.schema import engine as db_engine
+        async with db_engine.connect() as conn:
+            result = await conn.execute(
+                text(
+                    "SELECT id, tender_id, error, retry_count, created_at "
+                    "FROM ingestion_dlq ORDER BY created_at DESC LIMIT :limit OFFSET :offset"
+                ),
+                {"limit": limit, "offset": offset},
+            )
+            rows = [dict(r) for r in result.mappings().all()]
+
+            total_result = await conn.execute(text("SELECT COUNT(*) FROM ingestion_dlq"))
+            total = total_result.scalar()
+
+        # Convert datetime to string for JSON serialisation
+        for row in rows:
+            if row.get("created_at"):
+                row["created_at"] = str(row["created_at"])
+
+        return {"total": total, "limit": limit, "offset": offset, "entries": rows}
+    except Exception as e:
+        logging.error(f"DLQ fetch error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/chat")
 async def chat_tender(request: ChatRequest):
@@ -179,26 +241,15 @@ async def search_tenders(request: SearchRequest):
         
         ids = results.get("ids", [[]])[0]
         metadatas = results.get("metadatas", [[]])[0]
-        distances = results.get("distances", [[]])[0]
-        
-        def get_score(d):
-            """Converts cosine distance to a relevance score.
-            Distance scale: 0.5 = perfect, 0.7 = strong, 0.9 = ok, 1.1 = weak, 1.3+ = irrelevant."""
-            if d <= 0.5: return 1.0
-            if d <= 0.7: return 1.0 - (0.15 * (d - 0.5) / 0.2)  # 1.0 -> 0.85
-            if d <= 0.9: return 0.85 - (0.30 * (d - 0.7) / 0.2) # 0.85 -> 0.55
-            if d <= 1.1: return 0.55 - (0.30 * (d - 0.9) / 0.2) # 0.55 -> 0.25
-            if d <= 1.3: return 0.25 - (0.25 * (d - 1.1) / 0.2) # 0.25 -> 0.0
-            return 0.0
+        # distances now holds the pre-computed multi-signal score [0,1] from the engine
+        scores_raw = results.get("distances", [[]])[0]
 
         for i, tender_id in enumerate(ids):
             meta = metadatas[i] if i < len(metadatas) else {}
-            dist = distances[i] if i < len(distances) else 1.5
+            score = scores_raw[i] if i < len(scores_raw) else 0.0
 
-            score = get_score(dist)
-            
             # Skip results that have effectively zero relevance
-            if score == 0.0:
+            if score <= 0.0:
                 continue
             score_pct = round(score * 100, 1)
             
@@ -244,7 +295,8 @@ async def search_tenders(request: SearchRequest):
             "query": request.query,
             "count": len(processed_results),
             "latency_seconds": latency,
-            "results": processed_results
+            "search_meta": results.get("meta", {}),
+            "results": processed_results,
         }
         
     except Exception as e:

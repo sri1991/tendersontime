@@ -1,12 +1,34 @@
-google-generativeai
-chromadb
-duckdb
-pandas
-pytest
+# LLM + Embeddings
 google-genai
+
+# Vector DB (retained for migration)
+chromadb
+
+# Primary datastore
+asyncpg
+sqlalchemy[asyncio]
+pgvector
+
+# Caching
+redis[asyncio]
+
+# Search
+rank_bm25
+
+# Data processing
+pandas
+openpyxl
+
+# API
 fastapi
 uvicorn
 python-multipart
+httpx
+
+# Utilities
 python-dotenv
-python-multipart
-rank_bm25
+tqdm
+
+# Testing
+pytest
+pytest-asyncio

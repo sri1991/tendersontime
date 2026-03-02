@@ -1,6 +1,35 @@
 services:
   # ----------------------------------------
-  # 1. Vector Database (ChromaDB)
+  # 1. PostgreSQL + pgvector (primary datastore)
+  # ----------------------------------------
+  - type: pserv
+    name: tenders-postgres
+    env: docker
+    image: pgvector/pgvector:pg16
+    plan: standard
+    disk:
+      name: postgres-storage
+      mountPath: /var/lib/postgresql/data
+      sizeGB: 20
+    envVars:
+      - key: POSTGRES_USER
+        value: tender
+      - key: POSTGRES_PASSWORD
+        generateValue: true
+      - key: POSTGRES_DB
+        value: tenderscout
+
+  # ----------------------------------------
+  # 2. Redis (intent analysis cache)
+  # ----------------------------------------
+  - type: pserv
+    name: tenders-redis
+    env: docker
+    image: redis:7-alpine
+    plan: starter
+
+  # ----------------------------------------
+  # 3. ChromaDB (retained during migration period)
   # ----------------------------------------
   - type: pserv
     name: tenders-chromadb
@@ -18,22 +47,32 @@ services:
         value: FALSE
 
   # ----------------------------------------
-  # 2. Search API
+  # 4. Search API
   # ----------------------------------------
   - type: web
     name: tenders-api
     env: python
     region: singapore
-    plan: starter
+    plan: standard
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn src.api:app --host 0.0.0.0 --port $PORT
     disk:
       name: feedback-storage
       mountPath: /opt/render/project/src/data
-      sizeGB: 1
+      sizeGB: 5
     envVars:
       - key: GEMINI_API_KEY
-        sync: false # User will be prompted to enter this
+        sync: false
+      - key: DATABASE_URL
+        fromService:
+          type: pserv
+          name: tenders-postgres
+          envVarKey: DATABASE_URL
+      - key: REDIS_URL
+        fromService:
+          type: pserv
+          name: tenders-redis
+          envVarKey: REDIS_URL
       - key: CHROMA_HOST
         fromService:
           type: pserv
@@ -41,26 +80,33 @@ services:
           property: host
       - key: CHROMA_PORT
         value: 8000
+      - key: SEARCH_BACKEND
+        value: postgres
       - key: PYTHON_VERSION
         value: 3.10.12
 
   # ----------------------------------------
-  # 3. Ingestion Worker (Cron Job)
+  # 5. Ingestion Worker (Cron — every 6 hours)
   # ----------------------------------------
   - type: cron
     name: ingestion-worker
     env: python
     region: singapore
-    schedule: "0 */6 * * *" # Every 6 hours
+    schedule: "0 */6 * * *"
     buildCommand: pip install -r requirements.txt
     startCommand: python src/ingest_full.py
     envVars:
       - key: GEMINI_API_KEY
         sync: false
-      - key: CHROMA_HOST
+      - key: DATABASE_URL
         fromService:
           type: pserv
-          name: tenders-chromadb
-          property: host
-      - key: CHROMA_PORT
-        value: 8000
+          name: tenders-postgres
+          envVarKey: DATABASE_URL
+      - key: REDIS_URL
+        fromService:
+          type: pserv
+          name: tenders-redis
+          envVarKey: REDIS_URL
+      - key: SEARCH_BACKEND
+        value: postgres
