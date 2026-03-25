@@ -1,0 +1,1178 @@
+[
+  {
+    "code": "03000000",
+    "description": "Agricultural, farming, fishing, forestry and related products"
+  },
+  {
+    "code": "03100000",
+    "description": "Agricultural and horticultural products"
+  },
+  {
+    "code": "03200000",
+    "description": "Cereals, potatoes, vegetables, fruits and nuts"
+  },
+  {
+    "code": "03400000",
+    "description": "Forestry and logging products"
+  },
+  {
+    "code": "03600000",
+    "description": "Fishery products"
+  },
+  {
+    "code": "09000000",
+    "description": "Petroleum products, fuel, electricity and other sources of energy"
+  },
+  {
+    "code": "09100000",
+    "description": "Fuels"
+  },
+  {
+    "code": "09200000",
+    "description": "Petroleum, coal and oil products"
+  },
+  {
+    "code": "09300000",
+    "description": "Electricity, heating, solar and nuclear energy"
+  },
+  {
+    "code": "14000000",
+    "description": "Mining, basic metals and related products"
+  },
+  {
+    "code": "14200000",
+    "description": "Sand, gravel, crushed stone and aggregates"
+  },
+  {
+    "code": "14600000",
+    "description": "Metal ores and alloys"
+  },
+  {
+    "code": "15000000",
+    "description": "Food, beverages, tobacco and related products"
+  },
+  {
+    "code": "15100000",
+    "description": "Animal products, meat and meat products"
+  },
+  {
+    "code": "15300000",
+    "description": "Fruit, vegetables and related products"
+  },
+  {
+    "code": "15500000",
+    "description": "Dairy products"
+  },
+  {
+    "code": "15800000",
+    "description": "Miscellaneous food products"
+  },
+  {
+    "code": "18000000",
+    "description": "Clothing, footwear, luggage articles and accessories"
+  },
+  {
+    "code": "18100000",
+    "description": "Occupational clothing, special workwear and accessories"
+  },
+  {
+    "code": "18200000",
+    "description": "Outergarments"
+  },
+  {
+    "code": "18800000",
+    "description": "Footwear"
+  },
+  {
+    "code": "22000000",
+    "description": "Printed matter and related products"
+  },
+  {
+    "code": "22100000",
+    "description": "Printed books, brochures and leaflets"
+  },
+  {
+    "code": "22400000",
+    "description": "Stamps, cheque forms, banknotes, stock certificates, trade advertising material"
+  },
+  {
+    "code": "22800000",
+    "description": "Registers, account books, note books, order books, receipt books"
+  },
+  {
+    "code": "24000000",
+    "description": "Chemical products"
+  },
+  {
+    "code": "24100000",
+    "description": "Gases"
+  },
+  {
+    "code": "24200000",
+    "description": "Dyes and pigments"
+  },
+  {
+    "code": "24300000",
+    "description": "Basic inorganic and organic chemicals"
+  },
+  {
+    "code": "24900000",
+    "description": "Miscellaneous chemical products"
+  },
+  {
+    "code": "30000000",
+    "description": "Office and computing machinery, equipment and supplies"
+  },
+  {
+    "code": "30100000",
+    "description": "Office machinery, equipment and supplies except computers, printers and furniture"
+  },
+  {
+    "code": "30200000",
+    "description": "Computer equipment and supplies"
+  },
+  {
+    "code": "30210000",
+    "description": "Data-processing machines"
+  },
+  {
+    "code": "30213000",
+    "description": "Personal computers"
+  },
+  {
+    "code": "30213100",
+    "description": "Portable computers"
+  },
+  {
+    "code": "30213200",
+    "description": "Tablet computer"
+  },
+  {
+    "code": "30220000",
+    "description": "Digital cartographic equipment"
+  },
+  {
+    "code": "30230000",
+    "description": "Computer-related equipment"
+  },
+  {
+    "code": "30232100",
+    "description": "Printers and plotters"
+  },
+  {
+    "code": "30233000",
+    "description": "Media storage and reader devices"
+  },
+  {
+    "code": "30236000",
+    "description": "Miscellaneous computer equipment"
+  },
+  {
+    "code": "31000000",
+    "description": "Electrical machinery, apparatus, equipment and consumables"
+  },
+  {
+    "code": "31100000",
+    "description": "Electric motors, generators and transformers"
+  },
+  {
+    "code": "31200000",
+    "description": "Electricity distribution and control apparatus"
+  },
+  {
+    "code": "31500000",
+    "description": "Lighting equipment and electric lamps"
+  },
+  {
+    "code": "31600000",
+    "description": "Electrical equipment"
+  },
+  {
+    "code": "31700000",
+    "description": "Electronic, electromechanical and electrotechnical supplies"
+  },
+  {
+    "code": "32000000",
+    "description": "Radio, television, communication, telecommunication and related equipment"
+  },
+  {
+    "code": "32200000",
+    "description": "Television transmitting apparatus, telephone apparatus, telegraphy"
+  },
+  {
+    "code": "32300000",
+    "description": "Television and radio receivers, and sound or video recording apparatus"
+  },
+  {
+    "code": "32400000",
+    "description": "Networks"
+  },
+  {
+    "code": "32420000",
+    "description": "Network equipment"
+  },
+  {
+    "code": "32500000",
+    "description": "Telecommunications equipment and supplies"
+  },
+  {
+    "code": "32520000",
+    "description": "Telecommunications cable and equipment"
+  },
+  {
+    "code": "32580000",
+    "description": "Data communications equipment"
+  },
+  {
+    "code": "32581000",
+    "description": "Data communications equipment"
+  },
+  {
+    "code": "33000000",
+    "description": "Medical equipments, pharmaceuticals and personal care products"
+  },
+  {
+    "code": "33100000",
+    "description": "Medical equipments"
+  },
+  {
+    "code": "33110000",
+    "description": "Imaging equipment for medical, dental and veterinary use"
+  },
+  {
+    "code": "33120000",
+    "description": "Electrophysiology and monitoring systems"
+  },
+  {
+    "code": "33140000",
+    "description": "Medical consumables"
+  },
+  {
+    "code": "33150000",
+    "description": "Radiotherapy, mechanotherapy, electrotherapy and physical therapy devices"
+  },
+  {
+    "code": "33600000",
+    "description": "Pharmaceutical products"
+  },
+  {
+    "code": "33690000",
+    "description": "Miscellaneous medicinal products"
+  },
+  {
+    "code": "33700000",
+    "description": "Personal care products"
+  },
+  {
+    "code": "34000000",
+    "description": "Transport equipment and auxiliary products to transportation"
+  },
+  {
+    "code": "34100000",
+    "description": "Motor vehicles"
+  },
+  {
+    "code": "34110000",
+    "description": "Passenger cars"
+  },
+  {
+    "code": "34120000",
+    "description": "Motor vehicles for the transport of ten or more persons"
+  },
+  {
+    "code": "34130000",
+    "description": "Motor vehicles for the transport of goods"
+  },
+  {
+    "code": "34200000",
+    "description": "Vehicle bodies, trailers or semi-trailers"
+  },
+  {
+    "code": "34300000",
+    "description": "Parts and accessories for vehicles"
+  },
+  {
+    "code": "34600000",
+    "description": "Railway and tramway locomotives and rolling stock"
+  },
+  {
+    "code": "34900000",
+    "description": "Miscellaneous transport equipment and spare parts"
+  },
+  {
+    "code": "35000000",
+    "description": "Security, fire-fighting, police and defence equipment"
+  },
+  {
+    "code": "35100000",
+    "description": "Emergency and security equipment"
+  },
+  {
+    "code": "35200000",
+    "description": "Police equipment"
+  },
+  {
+    "code": "35300000",
+    "description": "Arms and related articles"
+  },
+  {
+    "code": "35800000",
+    "description": "Personal and support equipment"
+  },
+  {
+    "code": "38000000",
+    "description": "Laboratory, optical and precision equipments"
+  },
+  {
+    "code": "38100000",
+    "description": "Navigational and meteorological instruments"
+  },
+  {
+    "code": "38300000",
+    "description": "Measuring instruments"
+  },
+  {
+    "code": "38500000",
+    "description": "Checking and testing apparatus"
+  },
+  {
+    "code": "38600000",
+    "description": "Optical instruments"
+  },
+  {
+    "code": "39000000",
+    "description": "Furniture, household equipment and cleaning products"
+  },
+  {
+    "code": "39100000",
+    "description": "Furniture"
+  },
+  {
+    "code": "39200000",
+    "description": "Furnishings"
+  },
+  {
+    "code": "39500000",
+    "description": "Textile articles"
+  },
+  {
+    "code": "39700000",
+    "description": "Household appliances"
+  },
+  {
+    "code": "39800000",
+    "description": "Cleaning and polishing products"
+  },
+  {
+    "code": "42000000",
+    "description": "Industrial machinery"
+  },
+  {
+    "code": "42100000",
+    "description": "Machinery for producing and using mechanical power"
+  },
+  {
+    "code": "42400000",
+    "description": "Lifting and handling equipment and parts"
+  },
+  {
+    "code": "42500000",
+    "description": "Cooling and ventilation equipment"
+  },
+  {
+    "code": "42900000",
+    "description": "Miscellaneous general and special-purpose machinery"
+  },
+  {
+    "code": "43000000",
+    "description": "Machinery for mining, quarrying, construction equipment"
+  },
+  {
+    "code": "43100000",
+    "description": "Mining equipment"
+  },
+  {
+    "code": "43200000",
+    "description": "Earthmoving and excavating machinery"
+  },
+  {
+    "code": "43300000",
+    "description": "Construction machinery"
+  },
+  {
+    "code": "44000000",
+    "description": "Construction structures and materials; auxiliary products to construction"
+  },
+  {
+    "code": "44100000",
+    "description": "Construction materials and related items"
+  },
+  {
+    "code": "44110000",
+    "description": "Construction materials"
+  },
+  {
+    "code": "44130000",
+    "description": "Sewers"
+  },
+  {
+    "code": "44160000",
+    "description": "Pipeline, piping, pipes, casing, tubing and related items"
+  },
+  {
+    "code": "44200000",
+    "description": "Structural products"
+  },
+  {
+    "code": "44300000",
+    "description": "Cable, wire and related products"
+  },
+  {
+    "code": "44400000",
+    "description": "Miscellaneous fabricated products"
+  },
+  {
+    "code": "44500000",
+    "description": "Tools, locks, keys, hinges, fasteners, chain and springs"
+  },
+  {
+    "code": "44600000",
+    "description": "Tanks, reservoirs and containers; central-heating radiators and boilers"
+  },
+  {
+    "code": "44613000",
+    "description": "Large containers"
+  },
+  {
+    "code": "45000000",
+    "description": "Construction work"
+  },
+  {
+    "code": "45100000",
+    "description": "Site preparation work"
+  },
+  {
+    "code": "45110000",
+    "description": "Building demolition and wrecking work and earthmoving"
+  },
+  {
+    "code": "45200000",
+    "description": "Works for complete or part construction and civil engineering work"
+  },
+  {
+    "code": "45210000",
+    "description": "Building construction work"
+  },
+  {
+    "code": "45212000",
+    "description": "Construction work for buildings relating to leisure, sports, culture, lodging and restaurants"
+  },
+  {
+    "code": "45213000",
+    "description": "Construction work for commercial buildings, warehouses and industrial buildings"
+  },
+  {
+    "code": "45220000",
+    "description": "Engineering works and construction works"
+  },
+  {
+    "code": "45230000",
+    "description": "Construction work for pipelines, communication and power lines, for highways, roads"
+  },
+  {
+    "code": "45231000",
+    "description": "Construction work for pipelines, communication and power lines"
+  },
+  {
+    "code": "45232000",
+    "description": "Ancillary works for pipelines and cables"
+  },
+  {
+    "code": "45233000",
+    "description": "Construction, foundation and surface works for highways, roads"
+  },
+  {
+    "code": "45240000",
+    "description": "Construction work for water projects"
+  },
+  {
+    "code": "45250000",
+    "description": "Construction works for plants, mining and manufacturing"
+  },
+  {
+    "code": "45260000",
+    "description": "Roof works and other special trade construction works"
+  },
+  {
+    "code": "45300000",
+    "description": "Building installation work"
+  },
+  {
+    "code": "45310000",
+    "description": "Electrical installation work"
+  },
+  {
+    "code": "45320000",
+    "description": "Insulation work"
+  },
+  {
+    "code": "45330000",
+    "description": "Plumbing and sanitary engineering works"
+  },
+  {
+    "code": "45340000",
+    "description": "Fencing, railing and security equipment installation work"
+  },
+  {
+    "code": "45400000",
+    "description": "Building completion work"
+  },
+  {
+    "code": "45420000",
+    "description": "Joinery and carpentry installation work"
+  },
+  {
+    "code": "45430000",
+    "description": "Floor and wall covering work"
+  },
+  {
+    "code": "45440000",
+    "description": "Painting and glazing work"
+  },
+  {
+    "code": "45450000",
+    "description": "Other building completion work"
+  },
+  {
+    "code": "45500000",
+    "description": "Hiring of construction and civil engineering machinery and equipment with operator"
+  },
+  {
+    "code": "48000000",
+    "description": "Software package and information systems"
+  },
+  {
+    "code": "48100000",
+    "description": "Industry specific software package"
+  },
+  {
+    "code": "48200000",
+    "description": "Networking, Internet and intranet software package"
+  },
+  {
+    "code": "48300000",
+    "description": "Document creation, drawing, imaging, scheduling and productivity software package"
+  },
+  {
+    "code": "48400000",
+    "description": "Transaction and custom software package"
+  },
+  {
+    "code": "48500000",
+    "description": "Communication and multimedia software package"
+  },
+  {
+    "code": "48600000",
+    "description": "Database and operating software package"
+  },
+  {
+    "code": "48700000",
+    "description": "Software package utilities"
+  },
+  {
+    "code": "48800000",
+    "description": "Information systems and servers"
+  },
+  {
+    "code": "48900000",
+    "description": "Miscellaneous software packages and computer systems"
+  },
+  {
+    "code": "50000000",
+    "description": "Repair and maintenance services"
+  },
+  {
+    "code": "50100000",
+    "description": "Repair, maintenance and associated services of vehicles and related equipment"
+  },
+  {
+    "code": "50300000",
+    "description": "Repair, maintenance and associated services of personal computers"
+  },
+  {
+    "code": "50400000",
+    "description": "Repair and maintenance services of medical and precision equipment"
+  },
+  {
+    "code": "50700000",
+    "description": "Repair and maintenance services of building installations"
+  },
+  {
+    "code": "51000000",
+    "description": "Installation services"
+  },
+  {
+    "code": "51100000",
+    "description": "Installation services of electrical and mechanical equipment"
+  },
+  {
+    "code": "51500000",
+    "description": "Installation services of machinery and equipment"
+  },
+  {
+    "code": "55000000",
+    "description": "Hotel, restaurant and retail trade services"
+  },
+  {
+    "code": "55100000",
+    "description": "Hotel services"
+  },
+  {
+    "code": "55300000",
+    "description": "Restaurant and food-serving services"
+  },
+  {
+    "code": "55400000",
+    "description": "Beverage-serving services"
+  },
+  {
+    "code": "55500000",
+    "description": "Canteen and catering services"
+  },
+  {
+    "code": "60000000",
+    "description": "Transport services"
+  },
+  {
+    "code": "60100000",
+    "description": "Road transport services"
+  },
+  {
+    "code": "60120000",
+    "description": "Taxi services"
+  },
+  {
+    "code": "60130000",
+    "description": "Special-purpose road passenger-transport services"
+  },
+  {
+    "code": "60140000",
+    "description": "Non-scheduled passenger transport"
+  },
+  {
+    "code": "60160000",
+    "description": "Road mail transport"
+  },
+  {
+    "code": "60200000",
+    "description": "Rail transport services"
+  },
+  {
+    "code": "60400000",
+    "description": "Air transport services"
+  },
+  {
+    "code": "60500000",
+    "description": "Space transport services"
+  },
+  {
+    "code": "63000000",
+    "description": "Supporting and auxiliary transport services; travel agencies services"
+  },
+  {
+    "code": "63100000",
+    "description": "Cargo handling and storage services"
+  },
+  {
+    "code": "63500000",
+    "description": "Travel agency, tour operator and tourist assistance services"
+  },
+  {
+    "code": "63700000",
+    "description": "Support services for land, water and air transport"
+  },
+  {
+    "code": "64000000",
+    "description": "Postal and telecommunications services"
+  },
+  {
+    "code": "64100000",
+    "description": "Post and courier services"
+  },
+  {
+    "code": "64200000",
+    "description": "Telecommunication services"
+  },
+  {
+    "code": "64210000",
+    "description": "Telephone and data transmission services"
+  },
+  {
+    "code": "64220000",
+    "description": "Internet services"
+  },
+  {
+    "code": "65000000",
+    "description": "Public utilities"
+  },
+  {
+    "code": "65100000",
+    "description": "Water distribution and related services"
+  },
+  {
+    "code": "65200000",
+    "description": "Gas distribution and related services"
+  },
+  {
+    "code": "65300000",
+    "description": "Electricity distribution and related services"
+  },
+  {
+    "code": "65400000",
+    "description": "Other sources of energy and distribution"
+  },
+  {
+    "code": "66000000",
+    "description": "Financial and insurance services"
+  },
+  {
+    "code": "66100000",
+    "description": "Banking and investment services"
+  },
+  {
+    "code": "66500000",
+    "description": "Insurance and pension services"
+  },
+  {
+    "code": "66600000",
+    "description": "Fund management services"
+  },
+  {
+    "code": "66700000",
+    "description": "Services auxiliary to financial intermediation"
+  },
+  {
+    "code": "70000000",
+    "description": "Real estate services"
+  },
+  {
+    "code": "70100000",
+    "description": "Real estate services with own property"
+  },
+  {
+    "code": "70300000",
+    "description": "Real estate agency services on a fee or contract basis"
+  },
+  {
+    "code": "70330000",
+    "description": "Property management services of real estate on a fee or contract basis"
+  },
+  {
+    "code": "71000000",
+    "description": "Architectural, construction, engineering and inspection services"
+  },
+  {
+    "code": "71100000",
+    "description": "Architectural and related services"
+  },
+  {
+    "code": "71200000",
+    "description": "Architectural and related services"
+  },
+  {
+    "code": "71300000",
+    "description": "Engineering services"
+  },
+  {
+    "code": "71310000",
+    "description": "Civil engineering consultancy and construction services"
+  },
+  {
+    "code": "71320000",
+    "description": "Engineering design services"
+  },
+  {
+    "code": "71400000",
+    "description": "Urban planning and landscape architectural services"
+  },
+  {
+    "code": "71500000",
+    "description": "Construction-related services"
+  },
+  {
+    "code": "71600000",
+    "description": "Technical testing, analysis and consultancy services"
+  },
+  {
+    "code": "71700000",
+    "description": "Monitoring and control services"
+  },
+  {
+    "code": "71800000",
+    "description": "Consulting services for water-supply and waste consultancy"
+  },
+  {
+    "code": "72000000",
+    "description": "IT services: consulting, software development, Internet and support"
+  },
+  {
+    "code": "72100000",
+    "description": "Computer hardware consultancy services"
+  },
+  {
+    "code": "72200000",
+    "description": "Software-related services"
+  },
+  {
+    "code": "72210000",
+    "description": "Programming services of packaged software products"
+  },
+  {
+    "code": "72220000",
+    "description": "Systems and technical consultancy services"
+  },
+  {
+    "code": "72230000",
+    "description": "Custom software development services"
+  },
+  {
+    "code": "72240000",
+    "description": "Systems analysis and programming services"
+  },
+  {
+    "code": "72250000",
+    "description": "System and support services"
+  },
+  {
+    "code": "72260000",
+    "description": "Software-related services"
+  },
+  {
+    "code": "72300000",
+    "description": "Data services"
+  },
+  {
+    "code": "72310000",
+    "description": "Data processing services"
+  },
+  {
+    "code": "72400000",
+    "description": "Internet services"
+  },
+  {
+    "code": "72500000",
+    "description": "Computer-related services"
+  },
+  {
+    "code": "72600000",
+    "description": "Computer support and consultancy services"
+  },
+  {
+    "code": "72700000",
+    "description": "Computer network services"
+  },
+  {
+    "code": "72800000",
+    "description": "Computer audit and testing services"
+  },
+  {
+    "code": "72900000",
+    "description": "Computer back-up and catalogue conversion services"
+  },
+  {
+    "code": "73000000",
+    "description": "Research and development services and related consultancy services"
+  },
+  {
+    "code": "73100000",
+    "description": "Research and experimental development services"
+  },
+  {
+    "code": "73200000",
+    "description": "Research and development consultancy services"
+  },
+  {
+    "code": "73300000",
+    "description": "Design and execution of research and development"
+  },
+  {
+    "code": "75000000",
+    "description": "Administration, defence and social security services"
+  },
+  {
+    "code": "75100000",
+    "description": "Administration services"
+  },
+  {
+    "code": "75200000",
+    "description": "Provision of services to the community"
+  },
+  {
+    "code": "75300000",
+    "description": "Compulsory social security services"
+  },
+  {
+    "code": "75400000",
+    "description": "Civil and social services"
+  },
+  {
+    "code": "77000000",
+    "description": "Agricultural, forestry, horticultural, aquacultural and apicultural services"
+  },
+  {
+    "code": "77100000",
+    "description": "Agricultural services"
+  },
+  {
+    "code": "77200000",
+    "description": "Forestry services"
+  },
+  {
+    "code": "77300000",
+    "description": "Horticultural services"
+  },
+  {
+    "code": "77500000",
+    "description": "Animal husbandry and aquacultural services"
+  },
+  {
+    "code": "79000000",
+    "description": "Business services: law, marketing, consulting, recruitment, printing and security"
+  },
+  {
+    "code": "79100000",
+    "description": "Legal services"
+  },
+  {
+    "code": "79200000",
+    "description": "Accounting, auditing and fiscal services"
+  },
+  {
+    "code": "79300000",
+    "description": "Market and economic research; polling and statistics"
+  },
+  {
+    "code": "79400000",
+    "description": "Business and management consultancy and related services"
+  },
+  {
+    "code": "79410000",
+    "description": "Business and management consultancy services"
+  },
+  {
+    "code": "79420000",
+    "description": "Management-related services"
+  },
+  {
+    "code": "79500000",
+    "description": "Office-support services"
+  },
+  {
+    "code": "79600000",
+    "description": "Recruitment services"
+  },
+  {
+    "code": "79700000",
+    "description": "Investigation and security services"
+  },
+  {
+    "code": "79710000",
+    "description": "Security services"
+  },
+  {
+    "code": "79800000",
+    "description": "Printing and related services"
+  },
+  {
+    "code": "79900000",
+    "description": "Miscellaneous business and business-related services"
+  },
+  {
+    "code": "80000000",
+    "description": "Education and training services"
+  },
+  {
+    "code": "80100000",
+    "description": "Primary education services"
+  },
+  {
+    "code": "80200000",
+    "description": "Secondary education services"
+  },
+  {
+    "code": "80300000",
+    "description": "Higher education services"
+  },
+  {
+    "code": "80400000",
+    "description": "Adult and other education services"
+  },
+  {
+    "code": "80500000",
+    "description": "Training services"
+  },
+  {
+    "code": "80510000",
+    "description": "Specialised training services"
+  },
+  {
+    "code": "80530000",
+    "description": "Vocational training services"
+  },
+  {
+    "code": "85000000",
+    "description": "Health and social work services"
+  },
+  {
+    "code": "85100000",
+    "description": "Health services"
+  },
+  {
+    "code": "85110000",
+    "description": "Hospital and related services"
+  },
+  {
+    "code": "85120000",
+    "description": "Medical and related services"
+  },
+  {
+    "code": "85130000",
+    "description": "Dental practice and related services"
+  },
+  {
+    "code": "85140000",
+    "description": "Miscellaneous health services"
+  },
+  {
+    "code": "85200000",
+    "description": "Veterinary services"
+  },
+  {
+    "code": "85300000",
+    "description": "Social work and related services"
+  },
+  {
+    "code": "90000000",
+    "description": "Sewage, refuse, cleaning and environmental services"
+  },
+  {
+    "code": "90100000",
+    "description": "Sewage services"
+  },
+  {
+    "code": "90200000",
+    "description": "Refuse and rubbish disposal and treatment"
+  },
+  {
+    "code": "90400000",
+    "description": "Sewage services"
+  },
+  {
+    "code": "90500000",
+    "description": "Refuse and related services"
+  },
+  {
+    "code": "90510000",
+    "description": "Refuse disposal and treatment"
+  },
+  {
+    "code": "90600000",
+    "description": "Cleaning and sanitation services in urban or rural areas"
+  },
+  {
+    "code": "90700000",
+    "description": "Environmental services"
+  },
+  {
+    "code": "90710000",
+    "description": "Environmental management"
+  },
+  {
+    "code": "90720000",
+    "description": "Environmental protection"
+  },
+  {
+    "code": "90730000",
+    "description": "Pollution tracking, monitoring and rehabilitation"
+  },
+  {
+    "code": "90900000",
+    "description": "Cleaning and hygiene services"
+  },
+  {
+    "code": "90910000",
+    "description": "Cleaning services"
+  },
+  {
+    "code": "90920000",
+    "description": "Environmental hygiene services"
+  },
+  {
+    "code": "92000000",
+    "description": "Recreational, cultural and sporting services"
+  },
+  {
+    "code": "92100000",
+    "description": "Motion picture and video services"
+  },
+  {
+    "code": "92200000",
+    "description": "Radio and television services"
+  },
+  {
+    "code": "92300000",
+    "description": "Entertainment services"
+  },
+  {
+    "code": "92400000",
+    "description": "News agency services"
+  },
+  {
+    "code": "92500000",
+    "description": "Library, archive, museum and other cultural services"
+  },
+  {
+    "code": "92600000",
+    "description": "Sporting services"
+  },
+  {
+    "code": "98000000",
+    "description": "Other community, social and personal services"
+  },
+  {
+    "code": "98100000",
+    "description": "Services furnished by membership organisations"
+  },
+  {
+    "code": "98200000",
+    "description": "Equal opportunities consultancy services"
+  },
+  {
+    "code": "98300000",
+    "description": "Miscellaneous services"
+  },
+  {
+    "code": "98310000",
+    "description": "Washing and dry-cleaning services"
+  },
+  {
+    "code": "98320000",
+    "description": "Hairdressing and beauty treatment services"
+  },
+  {
+    "code": "98330000",
+    "description": "Physical well-being services"
+  },
+  {
+    "code": "98360000",
+    "description": "Marine services"
+  },
+  {
+    "code": "98390000",
+    "description": "Other services"
+  },
+  {
+    "code": "98400000",
+    "description": "Funeral and related services"
+  }
+]
