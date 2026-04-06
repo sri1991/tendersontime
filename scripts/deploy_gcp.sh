@@ -9,9 +9,18 @@ echo "==> Installing Docker..."
 apt-get update -q
 apt-get install -y ca-certificates curl gnupg nginx
 install -m 0755 -d /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+
+# Detect OS (Ubuntu vs Debian) and use correct Docker repo
+. /etc/os-release
+if [ "$ID" = "ubuntu" ]; then
+  DOCKER_REPO="https://download.docker.com/linux/ubuntu"
+else
+  DOCKER_REPO="https://download.docker.com/linux/debian"
+fi
+
+curl -fsSL "${DOCKER_REPO}/gpg" | gpg --dearmor -o /etc/apt/keyrings/docker.gpg --yes
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
-  https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
+  ${DOCKER_REPO} ${VERSION_CODENAME} stable" \
   > /etc/apt/sources.list.d/docker.list
 apt-get update -q
 apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
