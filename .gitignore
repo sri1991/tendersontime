@@ -15,6 +15,16 @@ venv/
 # Database
 chroma_db/
 temp_chroma/
+*.pgdump
+*.tar.gz
+
+# Runtime data
+data/
+checkpoints/
+temp_ingest/
+
+# Reports
+tests/reports/
 
 # Logs
 *.log

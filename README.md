@@ -1,271 +1,270 @@
+# TenderScout AI
 
-# 🛡️ TenderScout AI
+AI-powered tender search engine. Processes 80k+ tenders, indexes into PostgreSQL+pgvector, answers natural language queries with hybrid semantic + full-text search.
 
-A high-precision, AI-powered Tender Search Engine designed to process 80,000+ tenders daily. It leverages **Multimodal Enrichment (Gemini 2.5)** and **Vector Search (ChromaDB)** to deliver accurate, context-aware results significantly cheaper than traditional methods.
-
----
-- **[System Documentation](SYSTEM_DOCUMENTATION.md)**: Comprehensive guide to the implementation, including ingestion logic, search algorithms, and debugging workflows.
-
-## 🏗️ System Architecture & Workflow
-
-The pipeline consists of a highly optimized 4-stage process:
-
-```mermaid
-graph TD
-    A["Raw CSV Data"] -->|"1. Pre-Filtering"| B{"Is Relevant?"}
-    B -->|"No (Short/Junk)"| X["Discard"]
-    B -->|"Yes"| C{"2. Enrichment Agent"}
-    C -->|"Context Caching"| D["Gemini 2.5 Flash Lite"]
-    D -->|"Enriched JSON"| E["3. Indexing & Embeddings"]
-    E -->|"gemini-embedding-001"| F[("ChromaDB Vector Store")]
-    
-    U["User Query"] -->|"4. Search Engine"| G{"Intent Analysis"}
-    G -->|"Vector Similarity"| F
-    F -->|"Ranked Results"| H["FastAPI Backend"]
-    H -->|"JSON Response"| I["Frontend UI"]
-```
-
-### 1. Pre-Filtering Strategy
-Before incurring AI costs, we filter out low-value data:
-*   **Text Length Check**: Discards records with <20 characters.
-*   **Keyword Match**: Only processes tenders matching the `keywords.json` taxonomy.
-*   **Impact**: Skips ~10-20% of irrelevant data.
-
-### 2. Cost-Efficient Enrichment
-We use **Google Gemini 2.5 Flash Lite** with **Context Caching**:
-*   **The Problem**: Our prompt includes a huge 3,000-token/keyword taxonomy. Sending this for every tender is expensive.
-*   **The Solution**: We enable `caching.CachedContent`. The taxonomy is uploaded *once* (TTL 60 mins) and reused.
-*   **Cost Savings**: Reduces input token costs by **>90%**.
-
-### 3. Vector Indexing
-*   **Model**: `gemini-embedding-001` (via `google-genai` SDK v2).
-*   **Dimensions**: 768.
-*   **Process**: Converts enriched text (Summary + Tags + Keywords) into semantic vectors.
-
-### 4. Smart Search
-*   **Intent Analysis**: The search bar understands broad domains (e.g., "Medical" vs "Construction").
-*   **Hybrid Filtering**: Combines vector similarity with hard metadata filters (Country, Domain, Date).
+**Stack**: FastAPI · PostgreSQL+pgvector · Redis · Google Gemini · BM25 → pg FTS · Vanilla HTML/JS
 
 ---
 
-## 📊 Performance & Cost Analysis
-
-Based on live ingestion metrics (Jan 2026):
-
-| Metric | Estimate |
-| :--- | :--- |
-| **Throughput** | ~8.3 records / second |
-| **Ingestion Time (80k)** | ~2 hours 40 minutes |
-| **Enrichment Cost** | ~$10 - $12 / day |
-| **Embedding Cost** | ~$1.60 / day |
-| **Total Daily Cost** | **~$12.00 - $14.00** |
-
-*This represents a >50% reduction from initial estimates, achieved via Flash Lite & Caching.*
-
----
-
-## 🛠️ Models & Tech Stack
-
-| Component | Technology / Model | Reason |
-| :--- | :--- | :--- |
-| **Enrichment** | `gemini-2.5-flash-lite` | Best price-performance ratio for JSON extraction. |
-| **Embeddings** | `gemini-embedding-001` | Reliable, inexpensive semantic vectors. |
-| **Vector DB** | ChromaDB (Local) | Persistent, zero-latency local storage. |
-| **SDK** | `google-genai` (v0.6+) | Modern SDK supporting latest models. |
-| **Backend** | FastAPI | High-performance async Python server. |
-
----
-
-## 🚀 Getting Started
+## Quick Start
 
 ### Prerequisites
-- Python 3.10+
-- Google Cloud API Key with Gemini Access.
+- Docker + Docker Compose
+- Google Gemini API key
 
-### Installation
+### Start the system
 
-1.  **Clone the Repo**
-    ```bash
-    git clone https://github.com/sri1991/tendersontime.git
-    cd tendersontime
-    ```
+```bash
+# Copy and fill in your API key
+cp .env.example .env
+# GEMINI_API_KEY=your_key_here
 
-2.  **Install Dependencies**
-    ```bash
-    python3 -m venv venv
-    source venv/bin/activate
-    pip install -r requirements.txt
-    ```
+# Start all services (PostgreSQL, Redis, API)
+docker-compose up -d
 
-3.  **Configure Environment**
-    Create a `.env` file:
-    ```bash
-    GEMINI_API_KEY="your_api_key_here"
-    ```
+# Run migrations (first time only — adds FTS index + feedback table)
+docker cp src/db/migrations/002_fts_and_feedback.sql to_postgres:/tmp/002.sql
+docker exec to_postgres psql -U tender -d tenderscout -f /tmp/002.sql
 
-### Running the System
-
-1.  **Ingest Data (Full Pipeline)**
-    ```bash
-    # Prompts for CSV path and runs complete enrichment + indexing
-    python src/ingest_full.py
-    ```
-
-2.  **Start the Search Server**
-    ```bash
-    venv/bin/python -m uvicorn src.api:app --reload --host 0.0.0.0 --port 8000
-    ```
-
-3.  **Access UI**
-    Open `http://localhost:8000` in your browser.
-
----
-
-## 🤝 Contributing
-1.  Fork the repo.
-2.  Create a feature branch.
-3.  Commit changes.
-4.  Push to branch.
-5.  Open a Pull Request.
-
----
-*Built with ❤️ by TenderScout Team*
-
-
-A high-precision, AI-powered Tender Search Engine designed to solve the "needle in a haystack" problem. It uses **Multimodal Enrichment (Gemini 2.5)** and **Vector Search (ChromaDB)** to deliver accurate, context-aware results.
-
----
-
-## 🏗️ System Architecture (Optimized)
-
-The pipeline integrates advanced cost-optimization techniques to handle high-volume data:
-
-```mermaid
-graph TD
-    A[Raw CSV Data] -->|Pre-Filter Strategy| B{Is Relevant?}
-    B -->|No - Skip| X[Discard / Log]
-    B -->|Yes| C{Context Caching}
-    C -->|Static Prompt Cache| D{Gemini 2.5 Flash Lite}
-    D -->|Enriched Metadata| E[JSONL Records]
-    E -->|Mock Embeddings| F(ChromaDB Vector Store)
-    
-    U[User Query] -->|Intent Analysis| G{Search Engine}
-    G -->|Vector Search| F
-    F -->|Ranked Results| H[FastAPI Backend]
-    H -->|JSON Response| I[Frontend UI]
+# Open the UI
+open http://localhost:8000
 ```
 
-### Key Optimizations (2026-01-28)
-1.  **Context Caching**: The large keyword taxonomy (~3k tokens) is cached using `caching.CachedContent`, reducing input costs by >90%.
-2.  **Pre-Filtering**: Tenders with short descriptions (<20 chars) and no broad keyword matches are discarded before enrichment.
-3.  **Model Upgrade**: Migrated to `gemini-2.5-flash-lite` for faster, cheaper inference.
+### Health check
+
+```bash
+curl http://localhost:8000/health
+```
 
 ---
 
-## ⚠️ Current Limitations (Known Issues)
-> [!WARNING]
-> **Mock Embeddings Active**: The Google Embedding API (`text-embedding-004`) is currently returning `404` errors.
-> To allow the application to run for UI/UX testing, we have implemented **Mock Embeddings** (Non-Zero Vectors).
-> **Impact**: Search results will return data, but **semantic relevance is zero** (random sorting). Match scores will appear as 100% due to identical vector distances.
+## Architecture
+
+```
+Query → Intent Analysis (Gemini) ──┐
+      → Query Embedding (Gemini) ──┤
+                                   ↓
+                    pgvector HNSW search  ──┐
+                    pg FTS (GIN index)   ──┤→ RRF Fusion → Multi-signal Score → Rerank → Results
+                                            │
+                              0.50×vector + 0.25×fts + 0.15×title_match + 0.10×freshness
+```
+
+### Ingestion pipeline
+1. Pre-filter (length + keyword check)
+2. SHA-256 hash cache (skip already-processed tenders)
+3. Batch LLM enrichment (Gemini 2.5 Flash Lite, 10/prompt)
+4. Embedding (gemini-embedding-001, 3072-dim halfvec)
+5. PostgreSQL upsert → FTS column auto-updated by trigger
+6. Failed records → `ingestion_dlq` table
 
 ---
 
-## 🚀 Key Features
+## Operations
 
-### 1. **Semantic Search (Beyond Keywords)**
-   - Understands intent (e.g., "Hospital Construction" vs. "Medical Supply").
-   - Powered by Gemini 2.5 Flash Lite (Intent Analysis).
+### Ingest new tenders
 
-### 2. **Rich Metadata Display**
-   - Displays **Authority**, **Location**, **Closing Date**, and **TOT_ID**.
-   - **Clickable Titles** linking to original documents.
-   - **Match Score**: Visual indicator of relevance.
+```bash
+# Upload via UI
+open http://localhost:8000/src/ui/ingest.html
 
-### 3. **Smart Filters**
-   - **Corrigendum Toggle**: Easily include or exclude amendments/updates.
-   - **Entity Extraction**: Automatically identifies State, City, and Authority.
+# Or copy a CSV into the worker and run directly
+docker cp your_tenders.csv to_worker:/app/data/
+docker exec to_worker python -c "
+import asyncio
+from src.ingestion.pipeline import IngestionPipeline
+asyncio.run(IngestionPipeline('data/your_tenders.csv').run())
+"
+```
 
-### 4. **Resilient Data Pipeline**
-   - **Title Auto-Correction**: Fixes typos in source data.
-   - **Metadata Fallback**: Uses raw CSV data if AI extraction returns "Unknown".
+### Check ingestion status
 
----
+```bash
+curl http://localhost:8000/api/ingest/status
+```
 
-## Tech Stack
+### View failed ingestion records (DLQ)
 
-- **AI Model**: Google Gemini 2.5 Flash Lite (Enrichment & Intent)
-- **Embeddings**: Mock Vectors (Temporary) / Google `text-embedding-004` (Planned)
-- **Vector DB**: ChromaDB (Local Persistent)
-- **Backend**: Python FastAPI (`src/api.py`)
-- **Frontend**: Vanilla HTML/JS/CSS (`src/ui/index.html`)
+```bash
+curl http://localhost:8000/api/dlq
+```
 
----
+### Database stats
 
-## Getting Started
-
-### Prerequisites
-- Python 3.10+
-- Google Cloud API Key (Gemini)
-
-### Installation
-
-1.  **Clone the Repo**
-    ```bash
-    git clone https://github.com/sri1991/tendersontime.git
-    cd tendersontime
-    ```
-
-2.  **Install Dependencies**
-    ```bash
-    python3 -m venv venv
-    source venv/bin/activate
-    pip install -r requirements.txt
-    ```
-
-3.  **Configure Environment**
-    Create a `.env` file:
-    ```bash
-    GEMINI_API_KEY="your_api_key_here"
-    ```
-
-### Running the App
-
-1.  **Start the Server**
-    ```bash
-    venv/bin/python -m uvicorn src.api:app --reload --host 0.0.0.0 --port 8000
-    ```
-2.  **Open in Browser**
-    Go to `http://localhost:8000`
+```bash
+docker exec to_postgres psql -U tender -d tenderscout -c "
+SELECT
+    COUNT(*) as total_tenders,
+    COUNT(DISTINCT core_domain) as domains,
+    COUNT(DISTINCT country) as countries
+FROM tenders;
+"
+```
 
 ---
 
-## 📦 Data Pipeline Usage
+## Feedback Analysis
 
-To ingest new data:
+After users rate results (thumbs up/down), run the automated analysis:
 
-1.  **Full Automation (Recommended)**
-    Use `src/ingest_full.py` to process large datasets (configured for 20k records).
-    ```bash
-    python src/ingest_full.py
-    ```
+```bash
+# Copy the script into the container and run
+docker cp scripts/analyze_feedback.py to_api:/app/scripts/analyze_feedback.py
+docker exec to_api python scripts/analyze_feedback.py
 
-2.  **Manual Steps**
-    *   **Enrichment**: `python src/enrichment/processor.py input.csv output.jsonl --limit 1000`
-    *   **Index**: `python src/indexing/chroma_loader.py output.jsonl`
+# Generate HTML report
+docker exec to_api python scripts/analyze_feedback.py --html
+docker cp to_api:/app/tests/reports/<filename>.html tests/reports/
 
-echo "GEMINI_API_KEY=-JStA" > .env
+# Only include queries with 5+ ratings
+docker exec to_api python scripts/analyze_feedback.py --min-feedback 5 --html
+```
 
-python src/ingest_full.py [optional_path_to_excel_or_csv]    
+The report shows:
+- Per-query precision (thumbs up %)
+- Score calibration (are our score bands aligned with user perception?)
+- Score floor recommendation (what threshold to filter weak results)
+- Domain classification issues (Unclassified leakage)
+- Failure patterns (low-score results surfacing, top-20 irrelevant results)
+
+---
+
+## Benchmarking (vs SOLR baseline)
+
+```bash
+# Run full benchmark suite (10 queries)
+python scripts/benchmark_vs_solr.py
+
+# Single query
+python scripts/benchmark_vs_solr.py --query "animal ear tag" --limit 50
+
+# Reports saved to tests/reports/
+```
 
 ---
 
-## 🤝 Contributing
-1.  Fork the repo.
-2.  Create a feature branch.
-3.  Commit changes.
-4.  Push to branch.
-5.  Open a Pull Request.
+## Migrations
+
+```bash
+# Migration 001 — initial schema (runs automatically on first docker-compose up)
+# Migration 002 — FTS index + feedback table (run manually once)
+docker cp src/db/migrations/002_fts_and_feedback.sql to_postgres:/tmp/002.sql
+docker exec to_postgres psql -U tender -d tenderscout -f /tmp/002.sql
+```
 
 ---
-*Built with ❤️ by TenderScout Team*
 
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `GEMINI_API_KEY` | — | Required |
+| `DATABASE_URL` | `postgresql+asyncpg://tender:tender@postgres:5432/tenderscout` | PostgreSQL connection |
+| `REDIS_URL` | `redis://redis:6379/0` | Redis connection |
+| `SEARCH_BACKEND` | `postgres` | `postgres` or `chroma` (migration fallback) |
+| `INTENT_CACHE_TTL_SECONDS` | `3600` | Intent cache TTL (1 hour) |
+| `SEARCH_CACHE_TTL_SECONDS` | `600` | Search result cache TTL (10 min) |
+
+---
+
+## API Reference
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/search` | POST | Search tenders `{query, limit, include_corrigendum}` |
+| `/api/chat` | POST | Chat about a tender `{tender_id, message}` |
+| `/api/feedback` | POST | Submit rating `{query, result_id, rating, position, meta}` |
+| `/api/ingest/upload` | POST | Upload CSV for ingestion |
+| `/api/ingest/status` | GET | Ingestion progress |
+| `/api/dlq` | GET | Dead letter queue entries |
+| `/health` | GET | Service health (postgres, redis) |
+
+---
+
+## GCP Deployment
+
+### 1. Create the VM
+
+```bash
+gcloud compute instances create tenderscout \
+  --machine-type=e2-standard-2 \
+  --image-family=ubuntu-2204-lts \
+  --image-project=ubuntu-os-cloud \
+  --boot-disk-size=50GB \
+  --boot-disk-type=pd-ssd \
+  --tags=http-server \
+  --zone=asia-south1-a
+
+gcloud compute firewall-rules create allow-http \
+  --allow tcp:80 --target-tags http-server
+```
+
+Minimum VM size: **e2-standard-2** (2 vCPU, 8GB RAM).
+Anything smaller will OOM-kill PostgreSQL during vector index load.
+
+### 2. SSH in and deploy
+
+```bash
+gcloud compute ssh tenderscout --zone=asia-south1-a
+
+# On the VM:
+git clone https://github.com/sri1991/tendersontime.git /opt/tenderscout
+cd /opt/tenderscout
+chmod +x scripts/deploy_gcp.sh
+sudo ./scripts/deploy_gcp.sh
+```
+
+The script installs Docker, starts all containers, runs migrations, and configures nginx on port 80.
+
+### 3. Set your API key
+
+```bash
+sudo nano /opt/tenderscout/.env
+# Set: GEMINI_API_KEY=your_real_key
+
+sudo docker compose -f /opt/tenderscout/docker-compose.yml restart api ingest_worker
+```
+
+### 4. Restore your database (if migrating from local)
+
+```bash
+# On local machine — dump the DB
+docker exec to_postgres pg_dump -U tender tenderscout > tenderscout.pgdump
+
+# Copy to VM
+gcloud compute scp tenderscout.pgdump tenderscout:/tmp/ --zone=asia-south1-a
+
+# On VM — restore
+docker cp /tmp/tenderscout.pgdump to_postgres:/tmp/
+docker exec to_postgres pg_restore -U tender -d tenderscout -v /tmp/tenderscout.pgdump
+
+# Re-run migration 002 after restore
+docker cp src/db/migrations/002_fts_and_feedback.sql to_postgres:/tmp/002.sql
+docker exec to_postgres psql -U tender -d tenderscout -f /tmp/002.sql
+```
+
+### 5. Check it's running
+
+```bash
+curl http://$(curl -s ifconfig.me)/health
+```
+
+### Updating after code changes
+
+```bash
+cd /opt/tenderscout
+git pull
+docker compose up -d --build
+```
+
+---
+
+## Logs
+
+```bash
+# API logs
+docker logs to_api -f
+
+# PostgreSQL logs
+docker logs to_postgres -f
+```

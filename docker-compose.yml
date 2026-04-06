@@ -1,10 +1,8 @@
-version: '3.9'
-
 services:
-  # 1. PostgreSQL + pgvector (primary datastore)
   postgres:
     image: pgvector/pgvector:pg16
     container_name: to_postgres
+    restart: unless-stopped
     environment:
       POSTGRES_USER: tender
       POSTGRES_PASSWORD: tender
@@ -13,72 +11,72 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./src/db/migrations/001_initial.sql:/docker-entrypoint-initdb.d/001_initial.sql
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"   # bind to localhost only — not exposed to internet
+    deploy:
+      resources:
+        limits:
+          memory: 3G
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U tender -d tenderscout"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  # 2. Redis (intent analysis cache)
   redis:
     image: redis:7-alpine
     container_name: to_redis
+    restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"   # localhost only
+    deploy:
+      resources:
+        limits:
+          memory: 256M
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 3
 
-  # 3. ChromaDB (retained for migration — starts independently, API does not wait for it)
-  chroma:
-    image: chromadb/chroma:latest
-    container_name: to_chroma
-    volumes:
-      - ./chroma_db:/data
-    environment:
-      - IS_PERSISTENT=TRUE
-    # No healthcheck dependency — latest chromadb image does not include curl.
-    # The migration script connects to chroma directly; the API uses postgres.
-
-  # 4. Search API Service
   api:
     build: .
     container_name: to_api
-    command: uvicorn src.api:app --host 0.0.0.0 --port 8000
+    restart: unless-stopped
+    command: uvicorn src.api:app --host 0.0.0.0 --port 8000 --workers 2
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"   # nginx proxies to this — not exposed directly
     volumes:
       - ./data:/app/data
+    deploy:
+      resources:
+        limits:
+          memory: 1G
     environment:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - DATABASE_URL=postgresql+asyncpg://tender:tender@postgres:5432/tenderscout
       - REDIS_URL=redis://redis:6379/0
-      - CHROMA_HOST=chroma
-      - CHROMA_PORT=8000
       - SEARCH_BACKEND=${SEARCH_BACKEND:-postgres}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-    # chroma removed from depends_on — API runs on postgres, not chroma
 
-  # 5. Ingestion Worker
   ingest_worker:
     build: .
     container_name: to_worker
-    command: python -c "import time; print('Worker started. Sleeping...'); time.sleep(3600)"
+    restart: unless-stopped
+    command: python -c "import time; print('Worker ready'); time.sleep(86400)"
     volumes:
       - ./data:/app/data
+    deploy:
+      resources:
+        limits:
+          memory: 1500M    # ingestion is memory-heavy during embedding batches
     environment:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - DATABASE_URL=postgresql+asyncpg://tender:tender@postgres:5432/tenderscout
       - REDIS_URL=redis://redis:6379/0
-      - CHROMA_HOST=chroma
-      - CHROMA_PORT=8000
       - SEARCH_BACKEND=${SEARCH_BACKEND:-postgres}
     depends_on:
       postgres:

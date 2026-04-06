@@ -20,14 +20,18 @@ Use this mapping to identify specific `project_tags` that apply to this tender.
      - Parts/spares for agricultural machinery (e.g., Carbon bush for hand cutters, grass cutter wire) MUST be mapped to "Agriculture", NOT "Other" or "Technology".
      - Animal feed, Hay, Fodder, veterinary supplies MUST be mapped to "Agriculture".
      - Do not classify agriculture-related vehicles/equipment/tools as "Transport", "Infrastructure", or "Unclassified".
-   - **Project Tags**: Select 1-3 most relevant specific tags from the provided `keyword_mapping` (VALUES) if they match the tender content.
-     - Example: If tender is "Ear Tags", `core_domain`="Agriculture", `project_tags`=["Animal Identification Ear Tags"].
+     - **AUDIO/SAFETY EQUIPMENT IS NOT AGRICULTURE**: Earcups, earphones, headsets, ear defenders, ear protection helmets, hearing aids, and audio connectors MUST be "Technology" or "Other" — NEVER "Agriculture".
+     - **ELECTRICAL ITEMS ARE NOT AGRICULTURE**: Earthing rods, earth pipes, electrical conduit MUST be "Infrastructure" or "Technology" — NEVER "Agriculture".
+   - **Project Tags**: Select 1-3 most relevant tags from the provided `keyword_mapping` ONLY if the tag concept is EXPLICITLY present in the title or description. Do NOT infer tags from partial word matches (e.g., "Earcup" does NOT imply "Ear Tags" or "Livestock Identification").
+     - Correct: title="Supply of Cattle Ear Tags" → `project_tags`=["Animal Identification Ear Tags"].
+     - Wrong: title="Supply of Earcup for Headset" → do NOT add "Ear Tags" or any livestock tags.
    - Assign a `procurement_type` from this fixed list: [Works, Supply, Services, Unknown].
    - **Note**: "Consultancy" or "Hiring" should be mapped to "Services". "Construction" is "Works". "Purchase" is "Supply".
    - **CRITICAL**: Distinguish between "Hospital Construction" (Infrastructure) and "Medical Equipment" (Healthcare).
 
 2. **Semantic Expansion (The "Relatedness Map")**:
    - Generate `search_keywords` to help users find this tender even if they search for related terms.
+   - **CRITICAL GROUNDING RULE**: Every keyword MUST be supported by explicit content in the title or description. Do NOT add keywords for concepts not present in the tender. Do NOT infer from partial word matches ("ear" in "earcup" does NOT justify "ear tag" or "livestock" keywords).
    - **Logic**:
      - IF "Hospital" -> Add: "Clinic, Nursing Home, Dispensary, Medical Center, Healthcare Facility".
      - IF "Road" -> Add: "Highway, Pavement, Driveway, Street, Asphalt".

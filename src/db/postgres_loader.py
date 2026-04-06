@@ -1,8 +1,9 @@
 """
 PostgresLoader — replaces chroma_loader.py for new indexing.
 
-Writes enriched tender records to PostgreSQL+pgvector and maintains
-the persisted BM25 index on disk.
+Writes enriched tender records to PostgreSQL+pgvector.
+Full-text search (tsvector/GIN) is auto-maintained by PostgreSQL via the
+generated column added in migration 002 — no BM25 rebuild needed here.
 """
 
 import os
@@ -15,7 +16,6 @@ from google.genai import types
 from dotenv import load_dotenv
 
 from src.db.schema import engine, Tender, IngestionDLQ
-from src.db.bm25_store import BM25Store
 from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
@@ -30,8 +30,6 @@ class PostgresLoader:
             logger.warning("No GEMINI_API_KEY found. Embeddings will fail.")
 
         self.client_genai = genai.Client(api_key=self.api_key)
-        self.bm25_store = BM25Store()
-        self.bm25_store.load()
 
     def generate_embeddings(self, texts: List[str]) -> List[List[float]]:
         """Generates 3072-dim embeddings in batches of 50."""
@@ -190,10 +188,4 @@ class PostgresLoader:
                     await self.write_to_dlq(rec["id"], rec, f"DB upsert failed: {e}")
                 continue
 
-            # Update BM25 index incrementally
-            new_ids = [r["id"] for r in records]
-            self.bm25_store.update(new_ids, embedding_texts)
-
-        # Persist BM25 to disk after all batches
-        self.bm25_store.save()
-        logger.info("PostgreSQL loading complete. BM25 index saved.")
+        logger.info("PostgreSQL loading complete. FTS index auto-maintained by DB.")

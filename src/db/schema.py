@@ -3,7 +3,7 @@ from typing import AsyncGenerator
 from sqlalchemy import (
     Column, Text, Boolean, Integer, ARRAY, TIMESTAMP
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.sql import func
@@ -47,6 +47,20 @@ class Tender(Base):
     embedding        = Column(HALFVEC(3072))
     created_at       = Column(TIMESTAMP(timezone=True), server_default=func.now())
     updated_at       = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class Feedback(Base):
+    __tablename__ = "feedback"
+
+    id         = Column(Integer, primary_key=True, autoincrement=True)
+    query      = Column(Text, nullable=False)
+    result_id  = Column(Text)
+    rating     = Column(Integer, nullable=False)
+    position   = Column(Integer)
+    session_id = Column(Text)
+    comment    = Column(Text)
+    meta       = Column(JSONB)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
 
 
 class IngestionDLQ(Base):

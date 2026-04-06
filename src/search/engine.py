@@ -1,12 +1,15 @@
 """
-SmartSearchEngine — re-architected for PostgreSQL + pgvector.
+SmartSearchEngine — pgvector + PostgreSQL full-text search.
 
 Key improvements over v1:
-  - pgvector replaces ChromaDB for vector search (enables SQL-level filtering by date, domain, etc.)
-  - asyncio.gather parallelises intent analysis and query embedding (~400ms saved per query)
+  - pgvector replaces ChromaDB for vector search (SQL-level filtering)
+  - PostgreSQL FTS (tsvector/GIN) replaces in-memory BM25 — scales to millions
+    of rows, no RAM overhead, no per-process pickle, no rebuild on startup
+  - asyncio.gather parallelises intent analysis and query embedding
   - Redis intent cache eliminates LLM call for repeated/similar queries
-  - BM25 index loaded from disk (not rebuilt from DB on every startup)
-  - Honest multi-signal scoring: vector_sim (60%) + BM25 (30%) + freshness (10%)
+  - Redis search result cache (10 min TTL) short-circuits identical queries
+  - Fully async embedding — no asyncio.to_thread thread overhead
+  - Honest multi-signal scoring: vector_sim (60%) + FTS (30%) + freshness (10%)
   - Conditional re-ranking: skip LLM re-rank when top result is already excellent
 """
 
@@ -23,8 +26,8 @@ from dotenv import load_dotenv
 from sqlalchemy import text
 
 from src.db.schema import engine as db_engine
-from src.db.bm25_store import BM25Store
 from src.cache.intent_cache import IntentCache
+from src.cache.search_cache import SearchCache
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -58,13 +61,37 @@ Return JSON:
 """
 
 
+def _title_match_score(title: str, query: str) -> float:
+    """
+    Returns 0.0–1.0 based on the fraction of meaningful query terms
+    that appear in the title.  Rewards exact-phrase matches heavily.
+
+    Examples:
+      query="animal ear tag", title="Supply of Animal Ear Tags for Cattle" → 1.0
+      query="animal ear tag", title="Animal Feed Supply"                   → 0.33
+      query="animal ear tag", title="Medical Equipment"                    → 0.0
+    """
+    if not title or not query:
+        return 0.0
+    title_lower = title.lower()
+    query_lower = query.lower()
+
+    # Full phrase match → maximum score
+    if query_lower in title_lower:
+        return 1.0
+
+    # Partial: fraction of query words (length > 2) found in title
+    words = [w for w in query_lower.split() if len(w) > 2]
+    if not words:
+        return 0.0
+    matches = sum(1 for w in words if w in title_lower)
+    return matches / len(words)
+
+
 def _freshness_score(closing_date_str: Optional[str]) -> float:
-    """
-    Converts a closing date string to a freshness score [0.0, 1.0].
-    Urgent tenders (closing soon) score higher.
-    """
+    """Converts a closing date string to a freshness score [0.0, 1.0]."""
     if not closing_date_str:
-        return 0.4  # unknown date — neutral
+        return 0.4
 
     try:
         closing = datetime.strptime(closing_date_str, "%Y-%m-%d").date()
@@ -72,37 +99,45 @@ def _freshness_score(closing_date_str: Optional[str]) -> float:
         days_left = (closing - today).days
 
         if days_left < 0:
-            return 0.1   # already closed — still show, but low boost
+            return 0.1
         if days_left <= 7:
-            return 1.0   # urgent
+            return 1.0
         if days_left <= 30:
             return 0.8
         if days_left <= 90:
             return 0.6
-        return 0.4       # far future
+        return 0.4
     except (ValueError, TypeError):
         return 0.4
 
 
 def _multi_signal_score(
     vector_distance: float,
-    bm25_score: float,
-    max_bm25: float,
+    fts_score: float,
+    max_fts: float,
     closing_date_str: Optional[str],
+    title_match: float = 0.0,
 ) -> float:
     """
-    Combines vector similarity, BM25 relevance, and freshness into a single score [0.0, 1.0].
+    Combines vector similarity, FTS relevance, title match, and freshness.
 
     Weights:
-      vector_sim : 0.6
-      bm25_norm  : 0.3
-      freshness  : 0.1
+      vector_sim  : 0.50
+      fts_norm    : 0.25
+      title_match : 0.15
+      freshness   : 0.10
     """
     vector_sim = max(0.0, 1.0 - vector_distance)
-    bm25_norm = (bm25_score / max_bm25) if max_bm25 > 0 else 0.0
+    fts_norm = (fts_score / max_fts) if max_fts > 0 else 0.0
     freshness = _freshness_score(closing_date_str)
 
-    return round(0.6 * vector_sim + 0.3 * bm25_norm + 0.1 * freshness, 4)
+    return round(
+        0.50 * vector_sim +
+        0.25 * fts_norm +
+        0.15 * title_match +
+        0.10 * freshness,
+        4,
+    )
 
 
 class SmartSearchEngine:
@@ -113,21 +148,16 @@ class SmartSearchEngine:
 
         self.client_genai = genai.Client(api_key=self.api_key)
 
-        # BM25 from disk — fast startup, no DB rebuild
-        self.bm25_store = BM25Store()
-        loaded = self.bm25_store.load()
-        if not loaded:
-            logger.warning("BM25 index not found on disk. Keyword search will be unavailable until first ingestion.")
-
-        # Redis intent cache
+        # Redis caches
         self.intent_cache = IntentCache()
+        self.search_cache = SearchCache()
 
         # Determine search backend (postgres or chroma for migration period)
         self.backend = os.getenv("SEARCH_BACKEND", "postgres")
         if self.backend == "chroma":
             self._init_chroma_fallback()
 
-        logger.info(f"SmartSearchEngine initialised (backend={self.backend}, BM25={'ready' if self.bm25_store.is_ready else 'empty'}).")
+        logger.info(f"SmartSearchEngine initialised (backend={self.backend}).")
 
     def _init_chroma_fallback(self):
         """Initialise ChromaDB client for migration-period fallback."""
@@ -145,7 +175,6 @@ class SmartSearchEngine:
     # ──────────────────────────────────────────────────────────
 
     async def analyze_intent(self, query: str) -> Dict[str, Any]:
-        # 1. Check Redis cache first
         cached = await self.intent_cache.get(query)
         if cached is not None:
             logger.info(f"Intent cache HIT: {query[:50]}")
@@ -163,8 +192,6 @@ class SmartSearchEngine:
             )
             text_raw = response.text.replace("```json", "").replace("```", "").strip()
             intent = json.loads(text_raw)
-
-            # Store in cache
             await self.intent_cache.set(query, intent)
             return intent
         except Exception as e:
@@ -172,10 +199,22 @@ class SmartSearchEngine:
             return {}
 
     # ──────────────────────────────────────────────────────────
-    # Embedding
+    # Embedding  (fully async — no thread overhead)
     # ──────────────────────────────────────────────────────────
 
+    async def get_embedding_async(self, text_input: str) -> List[float]:
+        try:
+            response = await self.client_genai.aio.models.embed_content(
+                model="gemini-embedding-001",
+                contents=text_input,
+            )
+            return response.embeddings[0].values
+        except Exception as e:
+            logger.error(f"Async embedding failed: {e}")
+            raise
+
     def get_embedding(self, text_input: str) -> List[float]:
+        """Synchronous embedding (used by postgres_loader during ingestion)."""
         try:
             response = self.client_genai.models.embed_content(
                 model="gemini-embedding-001",
@@ -198,10 +237,6 @@ class SmartSearchEngine:
         include_corrigendum: bool,
         fetch_k: int,
     ) -> List[Dict[str, Any]]:
-        """
-        Runs pgvector cosine similarity search with SQL-level filters.
-        Returns list of dicts with all tender fields + distance.
-        """
         vec_str = "[" + ",".join(str(v) for v in query_vec) + "]"
 
         conditions = ["embedding IS NOT NULL"]
@@ -232,10 +267,48 @@ class SmartSearchEngine:
         try:
             async with db_engine.connect() as conn:
                 result = await conn.execute(sql, params)
-                rows = result.mappings().all()
-                return [dict(r) for r in rows]
+                return [dict(r) for r in result.mappings().all()]
         except Exception as e:
             logger.error(f"pgvector search failed: {e}")
+            return []
+
+    # ──────────────────────────────────────────────────────────
+    # Full-Text Search (PostgreSQL tsvector/GIN — replaces BM25)
+    # ──────────────────────────────────────────────────────────
+
+    async def _fts_search_postgres(
+        self,
+        query: str,
+        fetch_k: int,
+    ) -> List[Dict[str, Any]]:
+        """
+        Runs PostgreSQL full-text search using the pre-built GIN index.
+
+        websearch_to_tsquery handles natural language input (AND by default,
+        phrases in quotes, OR/NOT supported).  ts_rank_cd uses cover density
+        which is better for short keyword phrases like tender searches.
+
+        Returns full row data including fts_score so no second DB round-trip
+        is needed for FTS-only results.
+        """
+        sql = text("""
+            SELECT
+                id, tot_id, ref_no, title, description, signal_summary,
+                search_keywords, project_tags, core_domain, procurement_type,
+                authority_name, location_city, location_state, country,
+                closing_date, url, is_corrigendum,
+                ts_rank_cd(fts, websearch_to_tsquery('pg_catalog.english'::regconfig, :query)) AS fts_score
+            FROM tenders
+            WHERE fts @@ websearch_to_tsquery('pg_catalog.english'::regconfig, :query)
+            ORDER BY fts_score DESC
+            LIMIT :limit
+        """)
+        try:
+            async with db_engine.connect() as conn:
+                result = await conn.execute(sql, {"query": query, "limit": fetch_k})
+                return [dict(r) for r in result.mappings().all()]
+        except Exception as e:
+            logger.error(f"FTS search failed: {e}")
             return []
 
     async def _vector_search_chroma(
@@ -274,11 +347,11 @@ class SmartSearchEngine:
     def _reciprocal_rank_fusion(
         self,
         vector_ids: List[str],
-        bm25_scores: Dict[str, float],
+        fts_ids: List[str],
         k: int = 60,
     ) -> List[tuple]:
         """
-        Combines vector and BM25 rankings with RRF.
+        Combines vector and FTS rankings with Reciprocal Rank Fusion.
         Returns list of (id, rrf_score) sorted descending.
         """
         scores: Dict[str, float] = {}
@@ -286,8 +359,7 @@ class SmartSearchEngine:
         for rank, doc_id in enumerate(vector_ids):
             scores[doc_id] = scores.get(doc_id, 0.0) + 1.0 / (k + rank)
 
-        bm25_ranked = sorted(bm25_scores.items(), key=lambda x: x[1], reverse=True)
-        for rank, (doc_id, _) in enumerate(bm25_ranked):
+        for rank, doc_id in enumerate(fts_ids):
             scores[doc_id] = scores.get(doc_id, 0.0) + 1.0 / (k + rank)
 
         return sorted(scores.items(), key=lambda x: x[1], reverse=True)
@@ -310,7 +382,6 @@ class SmartSearchEngine:
         if not results:
             return []
 
-        # Conditional skip: clear winner on a specific query
         if not is_broad and top_score >= 0.85:
             logger.info(f"Re-rank skipped (top_score={top_score:.2f}, specific query).")
             return results
@@ -381,12 +452,19 @@ OUTPUT FORMAT: [index1, index2, ...]
         include_corrigendum: bool = True,
     ) -> Dict[str, Any]:
         logger.info(f"Search: '{query}'")
+
+        # Check search result cache first
+        cached = await self.search_cache.get(query, k, include_corrigendum)
+        if cached is not None:
+            logger.info(f"Search cache HIT: '{query[:50]}'")
+            return cached
+
         fetch_k = k * 3
 
-        # Stage 1: Parallel intent analysis + query embedding
+        # Stage 1: Parallel intent analysis + query embedding (both fully async)
         intent, query_vec = await asyncio.gather(
             self.analyze_intent(query),
-            asyncio.to_thread(self.get_embedding, query),
+            self.get_embedding_async(query),
         )
         logger.info(f"Intent: {intent}")
 
@@ -394,55 +472,42 @@ OUTPUT FORMAT: [index1, index2, ...]
         is_broad = intent.get("is_broad_query", False)
         refined_query = intent.get("refined_query", query)
 
-        # Stage 2: Vector search
+        # Stage 2: Parallel vector search + FTS search
         if self.backend == "postgres":
-            vector_rows = await self._vector_search_postgres(
-                query_vec, domains, is_broad, include_corrigendum, fetch_k
+            vector_rows, fts_rows = await asyncio.gather(
+                self._vector_search_postgres(
+                    query_vec, domains, is_broad, include_corrigendum, fetch_k
+                ),
+                self._fts_search_postgres(refined_query, fetch_k),
             )
         else:
-            # ChromaDB fallback
+            # ChromaDB fallback — FTS not available in this path
             where_clause = {}
             if not is_broad and domains:
                 where_clause = {"core_domain": {"$in": domains}} if len(domains) > 1 else {"core_domain": domains[0]}
             if not include_corrigendum:
                 where_clause = {"$and": [where_clause, {"is_corrigendum": {"$ne": True}}]} if where_clause else {"is_corrigendum": {"$ne": True}}
             vector_rows = await self._vector_search_chroma(query_vec, where_clause or None, fetch_k)
+            fts_rows = []
 
         vector_ids = [r["id"] for r in vector_rows]
         distance_map = {r["id"]: r.get("distance", 1.0) for r in vector_rows}
+        fts_score_map = {r["id"]: float(r.get("fts_score", 0.0)) for r in fts_rows}
         rows_by_id = {r["id"]: r for r in vector_rows}
 
-        # Stage 3: BM25 keyword search
-        bm25_scores = self.bm25_store.get_scores(refined_query, top_k=fetch_k) if self.bm25_store.is_ready else {}
+        # Merge FTS-only rows into rows_by_id (already have full metadata)
+        for r in fts_rows:
+            if r["id"] not in rows_by_id:
+                rows_by_id[r["id"]] = r
+                distance_map[r["id"]] = 1.0  # no vector distance — treat as max distance
 
-        # Stage 4: RRF fusion
-        fused = self._reciprocal_rank_fusion(vector_ids, bm25_scores)
+        # Stage 3: RRF fusion
+        fts_ids = [r["id"] for r in fts_rows]
+        fused = self._reciprocal_rank_fusion(vector_ids, fts_ids)
         top_fused_ids = [item[0] for item in fused[:fetch_k]]
 
-        # Stage 5: Fetch BM25-only rows not in vector results (metadata + actual distance)
-        bm25_only_ids = [tid for tid in top_fused_ids if tid not in rows_by_id]
-        if bm25_only_ids and self.backend == "postgres":
-            try:
-                vec_str = "[" + ",".join(str(v) for v in query_vec) + "]"
-                async with db_engine.connect() as conn:
-                    result = await conn.execute(
-                        text("SELECT id, tot_id, ref_no, title, description, signal_summary, "
-                             "search_keywords, project_tags, core_domain, procurement_type, "
-                             "authority_name, location_city, location_state, country, "
-                             "closing_date, url, is_corrigendum, "
-                             "(embedding <=> CAST(:vec AS halfvec)) AS distance "
-                             "FROM tenders WHERE id = ANY(:ids)"),
-                        {"ids": bm25_only_ids, "vec": vec_str},
-                    )
-                    for row in result.mappings().all():
-                        d = dict(row)
-                        distance_map[d["id"]] = d.get("distance", 1.0)
-                        rows_by_id[d["id"]] = d
-            except Exception as e:
-                logger.error(f"BM25-only metadata fetch failed: {e}")
-
-        # Stage 6: Assemble ordered result list
-        max_bm25 = max(bm25_scores.values()) if bm25_scores else 1.0
+        # Stage 4: Assemble ordered result list with multi-signal scores
+        max_fts = max(fts_score_map.values()) if fts_score_map else 1.0
         ordered = []
         for tid in top_fused_ids:
             if tid not in rows_by_id:
@@ -452,18 +517,18 @@ OUTPUT FORMAT: [index1, index2, ...]
                 continue
 
             dist = distance_map.get(tid, 1.0)
-            bm25_s = bm25_scores.get(tid, 0.0)
+            fts_s = fts_score_map.get(tid, 0.0)
             closing = str(row.get("closing_date") or "")
+            title_match = _title_match_score(row.get("title", ""), refined_query)
 
-            score = _multi_signal_score(dist, bm25_s, max_bm25, closing or None)
+            score = _multi_signal_score(dist, fts_s, max_fts, closing or None, title_match)
             row["_score"] = score
-            row["_bm25_only"] = row.get("bm25_only", False)
             ordered.append(row)
 
             if len(ordered) >= fetch_k:
                 break
 
-        # Stage 7: Conditional re-ranking
+        # Stage 5: Conditional re-ranking
         top_score = ordered[0]["_score"] if ordered else 0.0
         rerank_candidates = ordered[:50]
         remaining = ordered[50:]
@@ -471,17 +536,21 @@ OUTPUT FORMAT: [index1, index2, ...]
         reranked = await self.re_rank(query, rerank_candidates, top_score, is_broad)
         final = (reranked + remaining)[:k]
 
-        return {
+        result = {
             "ids":       [[r["id"] for r in final]],
-            "metadatas": [[{k: v for k, v in r.items() if not k.startswith("_")} for r in final]],
+            "metadatas": [[{key: v for key, v in r.items() if not key.startswith("_")} for r in final]],
             "distances": [[r["_score"] for r in final]],
             "documents": [[r.get("embedding_text", "") for r in final]],
             "meta": {
                 "intent": intent,
-                "bm25_available": self.bm25_store.is_ready,
                 "backend": self.backend,
             },
         }
+
+        # Populate search result cache
+        await self.search_cache.set(query, k, include_corrigendum, result)
+
+        return result
 
     # ──────────────────────────────────────────────────────────
     # Chat with a specific tender

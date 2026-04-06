@@ -27,8 +27,7 @@ app.mount("/src/ui", StaticFiles(directory="src/ui"), name="ui")
 # CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all for local dev
-    allow_credentials=True,
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -93,12 +92,6 @@ async def upload_ingest(background_tasks: BackgroundTasks, file: UploadFile = Fi
 @app.get("/api/ingest/status")
 async def get_ingest_status():
     global ingestion_state
-    
-    # Refresh Chroma Count (Simple approach)
-    # If search engine is available, use it
-    if search_engine and search_engine.collection:
-        ingestion_state["chroma_count"] = search_engine.collection.count()
-        
     return ingestion_state
 
 
@@ -153,13 +146,6 @@ async def health_check():
     except Exception as e:
         status["redis"] = {"status": "error", "detail": str(e)}
 
-    # BM25 index
-    if search_engine:
-        status["bm25"] = {
-            "ready": search_engine.bm25_store.is_ready,
-            "doc_count": search_engine.bm25_store.doc_count,
-        }
-
     return status
 
 
@@ -203,24 +189,24 @@ async def chat_tender(request: ChatRequest):
 @app.post("/api/feedback")
 async def submit_feedback(request: FeedbackRequest):
     try:
-        feedback_entry = {
-            "timestamp": datetime.now().isoformat(),
-            "query": request.query,
-            "result_id": request.result_id,
-            "rating": request.rating,
-            "position": request.position,
-            "session_id": request.session_id,
-            "result_metadata_snapshot": request.meta, # Valuable for training later
-            "comment": request.comment
-        }
-        
-        # Ensure data directory exists
-        os.makedirs("data", exist_ok=True)
-        
-        # In Docker, 'data/' should be a mounted volume
-        with open("data/feedback_logs.jsonl", "a") as f:
-            f.write(json.dumps(feedback_entry) + "\n")
-            
+        from sqlalchemy import text
+        from src.db.schema import engine as db_engine
+        async with db_engine.begin() as conn:
+            await conn.execute(
+                text(
+                    "INSERT INTO feedback (query, result_id, rating, position, session_id, comment, meta) "
+                    "VALUES (:query, :result_id, :rating, :position, :session_id, :comment, CAST(:meta AS jsonb))"
+                ),
+                {
+                    "query":      request.query,
+                    "result_id":  request.result_id,
+                    "rating":     request.rating,
+                    "position":   request.position,
+                    "session_id": request.session_id,
+                    "comment":    request.comment,
+                    "meta":       json.dumps(request.meta) if request.meta else None,
+                },
+            )
         return {"status": "success", "message": "Feedback recorded"}
     except Exception as e:
         logging.error(f"Feedback Error: {e}")
@@ -275,7 +261,7 @@ async def search_tenders(request: SearchRequest):
                 "score": score_pct,
                 "match_label": label,
                 "match_color": color,
-                "title": meta.get("original_title", "No Title"),
+                "title": meta.get("title") or meta.get("original_title") or "No Title",
                 "description": meta.get("description", "No description available."),
                 "core_domain": meta.get("core_domain", "Unclassified"),
                 "procurement_type": meta.get("procurement_type", "Unknown"),
