@@ -80,7 +80,7 @@ The original system was built to validate the product idea quickly. It works, bu
 
 ### New Environment Variables
 ```
-DATABASE_URL=postgresql+asyncpg://tender:tender@postgres:5432/tenderscout
+DATABASE_URL=postgresql+asyncpg://tender:<URL_ENCODED_PASSWORD>@postgres:5432/tenderscout
 REDIS_URL=redis://redis:6379/0
 ```
 

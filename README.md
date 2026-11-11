@@ -159,7 +159,7 @@ docker exec to_postgres psql -U tender -d tenderscout -f /tmp/002.sql
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `GEMINI_API_KEY` | — | Required |
-| `DATABASE_URL` | `postgresql+asyncpg://tender:tender@postgres:5432/tenderscout` | PostgreSQL connection |
+| `DATABASE_URL` | `postgresql+asyncpg://tender:<URL_ENCODED_PASSWORD>@postgres:5432/tenderscout` | PostgreSQL connection |
 | `REDIS_URL` | `redis://redis:6379/0` | Redis connection |
 | `SEARCH_BACKEND` | `postgres` | `postgres` or `chroma` (migration fallback) |
 | `INTENT_CACHE_TTL_SECONDS` | `3600` | Intent cache TTL (1 hour) |
@@ -268,3 +268,7 @@ docker logs to_api -f
 # PostgreSQL logs
 docker logs to_postgres -f
 ```
+
+## Credential configuration
+
+See [SECURITY_SETUP.md](SECURITY_SETUP.md) before starting or upgrading a deployment. Database credentials must be supplied explicitly; there are no shared password defaults.

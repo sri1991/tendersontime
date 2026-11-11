@@ -5,7 +5,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: tender
-      POSTGRES_PASSWORD: tender
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       POSTGRES_DB: tenderscout
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -53,7 +53,7 @@ services:
           memory: 1G
     environment:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - DATABASE_URL=postgresql+asyncpg://tender:tender@postgres:5432/tenderscout
+      - DATABASE_URL=${DATABASE_URL:?Set DATABASE_URL in .env}
       - REDIS_URL=redis://redis:6379/0
       - SEARCH_BACKEND=${SEARCH_BACKEND:-postgres}
     depends_on:
@@ -75,7 +75,7 @@ services:
           memory: 1500M    # ingestion is memory-heavy during embedding batches
     environment:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - DATABASE_URL=postgresql+asyncpg://tender:tender@postgres:5432/tenderscout
+      - DATABASE_URL=${DATABASE_URL:?Set DATABASE_URL in .env}
       - REDIS_URL=redis://redis:6379/0
       - SEARCH_BACKEND=${SEARCH_BACKEND:-postgres}
     depends_on:

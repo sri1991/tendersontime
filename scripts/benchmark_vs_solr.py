@@ -40,6 +40,12 @@ from typing import Optional
 
 import asyncpg
 import requests
+from dotenv import load_dotenv
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from src.credential_config import require_database_url
+
+load_dotenv()
 
 # ---------------------------------------------------------------------------
 # Defaults
@@ -52,10 +58,7 @@ DEFAULT_DATE  = "2025-08-06"
 QUERIES_FILE  = Path(__file__).parent.parent / "tests" / "queries.json"
 REPORTS_DIR   = Path(__file__).parent.parent / "tests" / "reports"
 
-DB_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://tender:tender@localhost:5433/tenderscout"
-).replace("postgresql+asyncpg://", "postgresql://").replace("+asyncpg", "")
+DB_URL = require_database_url(os.getenv("DATABASE_URL")).replace("postgresql+asyncpg://", "postgresql://").replace("+asyncpg", "")
 
 
 # ---------------------------------------------------------------------------

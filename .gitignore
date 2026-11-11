@@ -31,3 +31,9 @@ tests/reports/
 
 # OS
 .DS_Store
+
+.env.*
+
+*.env
+
+!.env.example
