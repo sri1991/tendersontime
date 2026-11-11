@@ -1,4 +1,6 @@
 import os
+from dotenv import load_dotenv
+from src.credential_config import require_database_url
 from typing import AsyncGenerator
 from sqlalchemy import (
     Column, Text, Boolean, Integer, ARRAY, TIMESTAMP
@@ -10,10 +12,8 @@ from sqlalchemy.sql import func
 from pgvector.sqlalchemy import HALFVEC
 
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql+asyncpg://tender:tender@localhost:5432/tenderscout"
-)
+load_dotenv()
+DATABASE_URL = require_database_url(os.getenv("DATABASE_URL"))
 
 engine = create_async_engine(DATABASE_URL, echo=False, pool_pre_ping=True)
 SessionLocal = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
