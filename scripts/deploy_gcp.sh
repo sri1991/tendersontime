@@ -7,7 +7,7 @@ set -e
 
 echo "==> Installing Docker..."
 apt-get update -q
-apt-get install -y ca-certificates curl gnupg nginx
+apt-get install -y ca-certificates curl gnupg nginx openssl
 install -m 0755 -d /etc/apt/keyrings
 
 # Detect OS (Ubuntu vs Debian) and use correct Docker repo
@@ -32,8 +32,11 @@ git clone https://github.com/sri1991/tendersontime.git tenderscout
 cd tenderscout
 
 echo "==> Writing .env (edit this with your real key)..."
-cat > .env <<'EOF'
-GEMINI_API_KEY=YOUR_KEY_HERE
+DB_PASSWORD="$(openssl rand -hex 24)"
+cat > .env <<EOF
+GEMINI_API_KEY=
+POSTGRES_PASSWORD=${DB_PASSWORD}
+DATABASE_URL=postgresql+asyncpg://tender:${DB_PASSWORD}@postgres:5432/tenderscout
 SEARCH_BACKEND=postgres
 EOF
 

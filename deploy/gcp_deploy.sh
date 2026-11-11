@@ -190,11 +190,7 @@ SEARCH_BACKEND=postgres
 POSTGRES_PASSWORD=${DB_PASSWORD}
 EOF
 
-# Also patch docker-compose to use the dynamic DB password
-gcloud compute ssh "$VM_NAME" --zone="$GCP_ZONE" --quiet -- \
-  "sed -i 's/POSTGRES_PASSWORD: tender/POSTGRES_PASSWORD: ${DB_PASSWORD}/' ${APP_DIR}/docker-compose.yml && \
-   sed -i 's|postgresql+asyncpg://tender:tender@|postgresql+asyncpg://tender:${DB_PASSWORD}@|g' ${APP_DIR}/docker-compose.yml"
-
+# Docker Compose reads the generated .env; no credentials are written into YAML.
 success ".env written with secure DB password"
 
 # ── Run VM setup script ───────────────────────────────────────────────────────

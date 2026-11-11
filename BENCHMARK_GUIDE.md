@@ -21,7 +21,7 @@ docker start tenderscout_redis
 **3. The API**
 ```bash
 GEMINI_API_KEY=your_gemini_api_key_here \
-DATABASE_URL=postgresql+asyncpg://tender:tender@localhost:5433/tenderscout \
+DATABASE_URL=postgresql+asyncpg://tender:<URL_ENCODED_PASSWORD>@localhost:5433/tenderscout \
 REDIS_URL=redis://localhost:6379/0 \
 SEARCH_BACKEND=postgres \
 venv/bin/uvicorn src.api:app --host 0.0.0.0 --port 8080 2>&1 &
