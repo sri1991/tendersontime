@@ -269,3 +269,7 @@ python src/ingest_full.py [optional_path_to_excel_or_csv]
 ---
 *Built with ❤️ by TenderScout Team*
 
+
+## Credential configuration
+
+See [SECURITY_SETUP.md](SECURITY_SETUP.md) before starting or upgrading a deployment. Database credentials must be supplied explicitly; there are no shared password defaults.
