@@ -1,4 +1,6 @@
 from functools import lru_cache
+from pydantic import field_validator
+from app.credential_config import require_database_url
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -12,7 +14,12 @@ class Settings(BaseSettings):
     embedding_dimension: int = 768
 
     # PostgreSQL
-    database_url: str = "postgresql+asyncpg://tenderscout:tenderscout@localhost:5432/tenderscout"
+    database_url: str
+
+    @field_validator("database_url")
+    @classmethod
+    def validate_database_url(cls, value: str) -> str:
+        return require_database_url(value)
 
     # Redis
     redis_url: str = "redis://localhost:6379/0"
